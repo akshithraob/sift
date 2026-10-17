@@ -84,8 +84,8 @@ class MlKitOcrScanner(
         }
 
     private fun createTempCacheFile(uri: Uri): File? {
+        val tempFile = File(context.cacheDir, "ocr_${UUID.randomUUID()}.tmp")
         return try {
-            val tempFile = File(context.cacheDir, "ocr_${UUID.randomUUID()}.tmp")
             context.contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(tempFile).use { output ->
                     input.copyTo(output)
@@ -93,6 +93,8 @@ class MlKitOcrScanner(
             }
             tempFile
         } catch (_: Exception) {
+            // A partial copy must not linger in the cache
+            tempFile.delete()
             null
         }
     }

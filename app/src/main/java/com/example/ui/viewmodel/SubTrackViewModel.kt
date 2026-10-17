@@ -64,6 +64,22 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    private var backgroundedAtMs = 0L
+
+    fun onAppBackgrounded() {
+        backgroundedAtMs = android.os.SystemClock.elapsedRealtime()
+    }
+
+    // Re-lock after a short grace period so system pickers (photos, files) don't force a re-auth
+    fun onAppForegrounded() {
+        if (backgroundedAtMs != 0L &&
+            android.os.SystemClock.elapsedRealtime() - backgroundedAtMs > RELOCK_GRACE_MS
+        ) {
+            lockApp()
+        }
+        backgroundedAtMs = 0L
+    }
+
     fun completeOnboarding(enableAppLock: Boolean) {
         prefs.isOnboardingCompleted = true
         prefs.isAppLockEnabled = enableAppLock
@@ -254,5 +270,9 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
             _pendingCandidates.value = emptyList()
             onComplete()
         }
+    }
+
+    private companion object {
+        const val RELOCK_GRACE_MS = 30_000L
     }
 }

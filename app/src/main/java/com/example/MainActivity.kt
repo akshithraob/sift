@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.navigation.SubTrackNavGraph
@@ -11,6 +12,18 @@ import com.example.ui.theme.SubTrackTheme
 import com.example.ui.viewmodel.SubTrackViewModel
 
 class MainActivity : FragmentActivity() {
+
+    private val viewModel: SubTrackViewModel by viewModels()
+
+    override fun onStop() {
+        super.onStop()
+        viewModel.onAppBackgrounded()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        viewModel.onAppForegrounded()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,8 +41,7 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             SubTrackTheme {
-                val viewModel: SubTrackViewModel = viewModel()
-                SubTrackNavGraph(viewModel = viewModel)
+                                SubTrackNavGraph(viewModel = viewModel)
             }
         }
     }

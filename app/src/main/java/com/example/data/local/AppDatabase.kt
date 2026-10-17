@@ -28,14 +28,10 @@ abstract class AppDatabase : RoomDatabase() {
             val builder = Room.databaseBuilder(appContext, AppDatabase::class.java, DB_NAME)
                 .fallbackToDestructiveMigration(true)
 
-            try {
-                System.loadLibrary("sqlcipher")
-                val passphrase = KeystoreHelper.getOrCreateDatabasePassphrase(appContext)
-                val factory = SupportOpenHelperFactory(passphrase)
-                builder.openHelperFactory(factory)
-            } catch (_: Throwable) {
-                // Graceful fallback for test or un-provisioned native environments
-            }
+            // Fail closed: never fall back to an unencrypted database
+            System.loadLibrary("sqlcipher")
+            val passphrase = KeystoreHelper.getOrCreateDatabasePassphrase(appContext)
+            builder.openHelperFactory(SupportOpenHelperFactory(passphrase))
 
             return builder.build()
         }

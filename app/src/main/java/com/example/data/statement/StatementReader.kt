@@ -101,8 +101,8 @@ class StatementReader(
     }
 
     private fun createTempCacheFile(uri: Uri): File? {
+        val tempFile = File(context.cacheDir, "stmt_${UUID.randomUUID()}.tmp")
         return try {
-            val tempFile = File(context.cacheDir, "stmt_${UUID.randomUUID()}.tmp")
             context.contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(tempFile).use { output ->
                     input.copyTo(output)
@@ -110,6 +110,8 @@ class StatementReader(
             }
             tempFile
         } catch (_: Exception) {
+            // A partial copy must not linger in the cache
+            tempFile.delete()
             null
         }
     }

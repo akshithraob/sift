@@ -54,7 +54,6 @@ fun LockScreen(
     onUnlocked: () -> Unit
 ) {
     val context = LocalContext.current
-    var pinInput by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     fun triggerBiometricPrompt() {
@@ -64,9 +63,17 @@ fun LockScreen(
             BiometricManager.Authenticators.BIOMETRIC_STRONG or
                     BiometricManager.Authenticators.DEVICE_CREDENTIAL
         )
-        if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
-            Toast.makeText(context, "Biometrics not configured on this device. Enter PIN below.", Toast.LENGTH_SHORT).show()
-            return
+        when (canAuth) {
+            BiometricManager.BIOMETRIC_SUCCESS -> Unit
+            // The device itself has no screen lock, so there is nothing to authenticate against
+            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
+                onUnlocked()
+                return
+            }
+            else -> {
+                errorMessage = "Device authentication is unavailable. Try again."
+                return
+            }
         }
 
         val executor = ContextCompat.getMainExecutor(context)
@@ -81,6 +88,7 @@ fun LockScreen(
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
+                    errorMessage = "Authentication required to open SubTrack."
                 }
             }
         )
@@ -172,85 +180,19 @@ fun LockScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Unlock with Biometrics / PIN",
+                    text = "Unlock with Biometrics / Device PIN",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
+            errorMessage?.let { message ->
                 Text(
-                    text = " OR ENTER PIN ",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            OutlinedTextField(
-                value = pinInput,
-                onValueChange = {
-                    if (it.length <= 6) {
-                        pinInput = it
-                        errorMessage = null
-                    }
-                },
-                label = { Text("Vault PIN (Default: 1234)") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("pin_input_field"),
-                isError = errorMessage != null
-            )
-
-            if (errorMessage != null) {
-                Text(
-                    text = errorMessage ?: "",
+                    text = message,
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier.padding(top = 12.dp)
                 )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedButton(
-                onClick = {
-                    if (pinInput == "1234" || pinInput.isNotEmpty()) {
-                        onUnlocked()
-                    } else {
-                        errorMessage = "Invalid PIN. Try 1234"
-                    }
-                },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("submit_pin_button")
-            ) {
-                Icon(imageVector = Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Unlock with PIN")
             }
         }
     }

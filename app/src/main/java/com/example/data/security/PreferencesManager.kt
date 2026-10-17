@@ -9,7 +9,6 @@ class PreferencesManager(context: Context) {
     companion object {
         private const val KEY_ONBOARDING_DONE = "key_onboarding_done"
         private const val KEY_APP_LOCK_ENABLED = "key_app_lock_enabled"
-        private const val KEY_APP_PIN = "key_app_pin"
         private const val KEY_NOTIFICATIONS_ENABLED = "key_notifications_enabled"
         private const val KEY_FIRST_RUN_SEEDED = "key_first_run_seeded"
     }
@@ -21,10 +20,6 @@ class PreferencesManager(context: Context) {
     var isAppLockEnabled: Boolean
         get() = prefs.getBoolean(KEY_APP_LOCK_ENABLED, true) // ON by default as requested
         set(value) = prefs.edit().putBoolean(KEY_APP_LOCK_ENABLED, value).apply()
-
-    var appPin: String
-        get() = prefs.getString(KEY_APP_PIN, "1234") ?: "1234"
-        set(value) = prefs.edit().putString(KEY_APP_PIN, value).apply()
 
     var isNotificationsEnabled: Boolean
         get() = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)

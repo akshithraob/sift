@@ -1,0 +1,128 @@
+[
+  {
+    "id": "netflix",
+    "aliases": ["netflix", "netflix entertainment", "netflix india"],
+    "name": "Netflix",
+    "category": "Entertainment",
+    "cancellationUrl": "https://www.netflix.com/youraccount",
+    "instructions": "Go to Account > Membership & Billing > Cancel Membership. You will retain access until the end of the current billing cycle.",
+    "supportContact": "help.netflix.com"
+  },
+  {
+    "id": "spotify",
+    "aliases": ["spotify", "spotify india", "spotify premium"],
+    "name": "Spotify Premium",
+    "category": "Entertainment",
+    "cancellationUrl": "https://www.spotify.com/account/overview/",
+    "instructions": "Log in to your Spotify Account page > Under 'Your plan' click 'Change plan' > Scroll down to 'Cancel Spotify' and confirm.",
+    "supportContact": "support.spotify.com"
+  },
+  {
+    "id": "hotstar",
+    "aliases": ["hotstar", "disney+ hotstar", "disney plus hotstar", "novi digital"],
+    "name": "Disney+ Hotstar",
+    "category": "Entertainment",
+    "cancellationUrl": "https://www.hotstar.com/in/my-account",
+    "instructions": "Open Hotstar app or web > My Space / Help & Settings > Subscriptions > Cancel Subscription.",
+    "supportContact": "help.hotstar.com"
+  },
+  {
+    "id": "prime",
+    "aliases": ["amazon prime", "amazon seller", "amazon digital", "prime video"],
+    "name": "Amazon Prime",
+    "category": "Entertainment & Shopping",
+    "cancellationUrl": "https://www.amazon.in/mc/manage",
+    "instructions": "Open Amazon app > Your Account > Manage Prime Membership > End Membership and Benefits.",
+    "supportContact": "amazon.in/contact-us"
+  },
+  {
+    "id": "youtube",
+    "aliases": ["youtube", "google youtube", "youtube premium"],
+    "name": "YouTube Premium",
+    "category": "Entertainment",
+    "cancellationUrl": "https://www.youtube.com/paid_memberships",
+    "instructions": "Open YouTube app > Profile photo > Purchases and memberships > Select membership > Deactivate.",
+    "supportContact": "support.google.com/youtube"
+  },
+  {
+    "id": "swiggy",
+    "aliases": ["swiggy", "swiggy one", "bundl technologies"],
+    "name": "Swiggy One",
+    "category": "Food & Delivery",
+    "cancellationUrl": "https://www.swiggy.com",
+    "instructions": "Open Swiggy app > Account > Swiggy One Membership > Manage / Do Not Auto-Renew.",
+    "supportContact": "support@swiggy.in"
+  },
+  {
+    "id": "zomato",
+    "aliases": ["zomato", "zomato gold"],
+    "name": "Zomato Gold",
+    "category": "Food & Dining",
+    "cancellationUrl": "https://www.zomato.com",
+    "instructions": "Open Zomato app > Profile > Zomato Gold > Manage Membership > Turn off Auto-Renew or Cancel.",
+    "supportContact": "help@zomato.com"
+  },
+  {
+    "id": "cultfit",
+    "aliases": ["cultfit", "cult.fit", "curefit", "cure.fit healthcare"],
+    "name": "Cult.fit (Curefit)",
+    "category": "Fitness & Health",
+    "cancellationUrl": "https://www.cult.fit",
+    "instructions": "Open Cult.fit app > Profile > Active Packs & Subscriptions > Select Membership > Cancel / Pause Subscription.",
+    "supportContact": "hello@cult.fit"
+  },
+  {
+    "id": "zerodha",
+    "aliases": ["zerodha", "coin by zerodha", "zerodha broking"],
+    "name": "Zerodha Coin (SIP)",
+    "category": "Investments",
+    "cancellationUrl": "https://coin.zerodha.com",
+    "instructions": "Open Coin app > Mutual Funds > SIPs > Select the Fund SIP > Click Delete / Pause SIP. Also cancel the e-Mandate in Console.",
+    "supportContact": "support.zerodha.com"
+  },
+  {
+    "id": "groww",
+    "aliases": ["groww", "groww invest tech", "nextbillion technology"],
+    "name": "Groww (SIP Autopay)",
+    "category": "Investments",
+    "cancellationUrl": "https://groww.in",
+    "instructions": "Open Groww app > Mutual Funds > SIPs tab > Select Active SIP > Tap Options (3 dots) > Cancel SIP.",
+    "supportContact": "support@groww.in"
+  },
+  {
+    "id": "airtel",
+    "aliases": ["airtel", "bharti airtel", "airtel broadband", "airtel payments"],
+    "name": "Airtel Autopay",
+    "category": "Telecom & Broadband",
+    "cancellationUrl": "https://www.airtel.in",
+    "instructions": "Open Airtel Thanks app > Pay / Bills > Manage Autopay > Disable Autopay on your Postpaid / Fiber connection.",
+    "supportContact": "121@in.airtel.com"
+  },
+  {
+    "id": "jio",
+    "aliases": ["jio", "reliance jio", "jio fiber", "jio infocomm"],
+    "name": "Jio Fiber / Autopay",
+    "category": "Telecom & Broadband",
+    "cancellationUrl": "https://www.jio.com",
+    "instructions": "Open MyJio app > Menu > JioPay > Autopay Mandates > Select active mandate > Revoke / Cancel.",
+    "supportContact": "care@jio.com"
+  },
+  {
+    "id": "google_one",
+    "aliases": ["google one", "google storage", "google play"],
+    "name": "Google One Storage",
+    "category": "Cloud & Productivity",
+    "cancellationUrl": "https://one.google.com/settings",
+    "instructions": "Open Google Play Store > Profile Icon > Payments & subscriptions > Subscriptions > Google One > Cancel subscription.",
+    "supportContact": "support.google.com/googleone"
+  },
+  {
+    "id": "apple",
+    "aliases": ["apple", "apple.com/bill", "apple services", "itunes"],
+    "name": "Apple Services / iCloud",
+    "category": "Cloud & Services",
+    "cancellationUrl": "https://support.apple.com/billing",
+    "instructions": "On iPhone: Settings > [Your Name] > Subscriptions > Select subscription > Cancel Subscription.",
+    "supportContact": "support.apple.com"
+  }
+]

@@ -1,0 +1,46 @@
+package com.example.data.local
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface SubscriptionDao {
+
+    @Query("SELECT * FROM subscriptions ORDER BY nextDateEpochMs ASC")
+    fun getAllSubscriptions(): Flow<List<SubscriptionEntity>>
+
+    @Query("SELECT * FROM subscriptions WHERE status = :status ORDER BY nextDateEpochMs ASC")
+    fun getSubscriptionsByStatus(status: String): Flow<List<SubscriptionEntity>>
+
+    @Query("SELECT * FROM subscriptions WHERE id = :id LIMIT 1")
+    suspend fun getSubscriptionById(id: Long): SubscriptionEntity?
+
+    @Query("SELECT * FROM subscriptions WHERE id = :id LIMIT 1")
+    fun getSubscriptionByIdFlow(id: Long): Flow<SubscriptionEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSubscription(subscription: SubscriptionEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(subscriptions: List<SubscriptionEntity>): List<Long>
+
+    @Update
+    suspend fun updateSubscription(subscription: SubscriptionEntity)
+
+    @Delete
+    suspend fun deleteSubscription(subscription: SubscriptionEntity)
+
+    @Query("DELETE FROM subscriptions WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM subscriptions")
+    suspend fun deleteAll()
+
+    @Query("UPDATE subscriptions SET status = :status WHERE id = :id")
+    suspend fun updateStatus(id: Long, status: String)
+}

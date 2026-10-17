@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
 import com.example.ui.theme.BrandPrimary
 import com.example.ui.theme.RailNach
 import com.example.ui.theme.RailUpi
@@ -158,9 +159,6 @@ fun ImportScreen(
                             viewModel.processStatementUri(uri, pass) { ok ->
                                 if (ok) onNavigateToReview()
                             }
-                        } else {
-                            viewModel.runSampleStatementImport()
-                            onNavigateToReview()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
@@ -460,22 +458,25 @@ private fun ImportActionCard(
                 Text(primaryButtonText, fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Sample-data shortcuts exist for development only
+            if (BuildConfig.DEBUG) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedButton(
-                onClick = onSimulateAction,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("${testTagPrefix}_simulate_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(simulateButtonText, fontSize = 13.sp)
+                OutlinedButton(
+                    onClick = onSimulateAction,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("${testTagPrefix}_simulate_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(simulateButtonText, fontSize = 13.sp)
+                }
             }
         }
     }

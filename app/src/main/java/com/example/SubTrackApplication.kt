@@ -49,8 +49,8 @@ class SubTrackApplication : Application() {
         subscriptionRepository = SubscriptionRepository(database.subscriptionDao())
         merchantRepository = MerchantRepository(this)
 
-        // Seed initial starter data if first run
-        CoroutineScope(Dispatchers.IO).launch {
+        // Demo data is seeded in debug builds only; release users start with an empty vault
+        if (BuildConfig.DEBUG) CoroutineScope(Dispatchers.IO).launch {
             try {
                 if (!preferencesManager.isFirstRunSeeded) {
                     val currentList = subscriptionRepository.getAllSubscriptions().first()

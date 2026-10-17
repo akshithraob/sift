@@ -149,7 +149,7 @@ class DefaultRecurringDetector : RecurringDetector {
         var clean = rawNarration.uppercase().trim()
 
         // 1. Strip UPI IDs (e.g. swiggy@icici, spotify@paytm, user@okaxis)
-        clean = clean.replace(Regex("[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+"), " ")
+        clean = clean.replace(Regex("[a-zA-Z0-9._]+@[a-zA-Z0-9.]+"), " ")
 
         // 2. Strip standard Indian bank transfer prefixes
         clean = clean.replace(Regex("^(TRANSFER TO\\s+[0-9]+/UPI/|UPI/CR/[0-9]+/|UPI-MANDATE-|UPI-AUTOPAY-|UPI/|UPI-|ACH D-|ACH-|ACH/|NACH-|NACH/|IB SI-|SI-|SI/|POS\\s+[0-9]+|POS/|POS-|NEFT-|RTGS-|IMPS-|BY TRANSFER-)"), " ")

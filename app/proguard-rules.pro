@@ -15,3 +15,6 @@
 
 # Keep Biometric classes
 -keep class androidx.biometric.** { *; }
+
+# PdfBox-Android optional JPEG2000 decoder (not bundled)
+-dontwarn com.gemalto.jp2.**

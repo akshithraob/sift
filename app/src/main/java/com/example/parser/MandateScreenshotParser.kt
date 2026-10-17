@@ -303,7 +303,7 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
             lower.contains("weekly") || lower.contains("/ wk") || lower.contains("/ week") -> Frequency.WEEKLY
             lower.contains("quarterly") || lower.contains("/ qtr") -> Frequency.QUARTERLY
             lower.contains("as presented") || lower.contains("as and when") -> Frequency.AS_PRESENTED
-            lower.contains("daily") -> Frequency.WEEKLY
+            lower.contains("daily") -> Frequency.AS_PRESENTED
             else -> Frequency.MONTHLY
         }
     }

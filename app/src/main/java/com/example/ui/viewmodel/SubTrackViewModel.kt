@@ -167,51 +167,57 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
     private val _isProcessingOcr = MutableStateFlow(false)
     val isProcessingOcr: StateFlow<Boolean> = _isProcessingOcr.asStateFlow()
 
-    // Real ML Kit Screenshot processing
-    fun processScreenshotUris(uris: List<android.net.Uri>, onComplete: () -> Unit) {
+    private val _importError = MutableStateFlow<String?>(null)
+    val importError: StateFlow<String?> = _importError.asStateFlow()
+
+    fun clearImportError() {
+        _importError.value = null
+    }
+
+    // Real ML Kit Screenshot processing. onComplete(true) only when real candidates were found.
+    fun processScreenshotUris(uris: List<android.net.Uri>, onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             _isProcessingOcr.value = true
+            _importError.value = null
+            var success = false
             try {
                 val candidates = app.mlKitOcrScanner.processScreenshots(uris)
                 if (candidates.isNotEmpty()) {
                     _pendingCandidates.value = candidates
+                    success = true
                 } else {
-                    // Fallback to sample parsed candidates if test image has no text
-                    _pendingCandidates.value = app.screenshotParser.getSampleCandidates()
+                    _importError.value = "No autopay mandates were found in the selected screenshots. Try a clearer screenshot of your UPI app's Autopay list."
                 }
             } catch (_: Exception) {
-                _pendingCandidates.value = app.screenshotParser.getSampleCandidates()
+                _importError.value = "Could not read the selected screenshots."
             } finally {
                 _isProcessingOcr.value = false
-                onComplete()
+                onComplete(success)
             }
         }
     }
 
-    // Real Statement processing (PDF/CSV)
-    fun processStatementUri(uri: android.net.Uri, password: String? = null, onComplete: () -> Unit) {
+    // Real Statement processing (PDF/CSV). onComplete(true) only when real candidates were found.
+    fun processStatementUri(uri: android.net.Uri, password: String? = null, onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             _isProcessingOcr.value = true
+            _importError.value = null
+            var success = false
             try {
                 val candidates = app.statementReader.processStatementFile(uri, password)
                 if (candidates.isNotEmpty()) {
                     _pendingCandidates.value = candidates
+                    success = true
                 } else {
-                    _pendingCandidates.value = runSampleStatementFallback()
+                    _importError.value = "No recurring payments were detected in this statement."
                 }
             } catch (_: Exception) {
-                _pendingCandidates.value = runSampleStatementFallback()
+                _importError.value = "Could not read this statement. Check the file and password."
             } finally {
                 _isProcessingOcr.value = false
-                onComplete()
+                onComplete(success)
             }
         }
-    }
-
-    private fun runSampleStatementFallback(): List<ParsedMandateCandidate> {
-        val sampleLines = app.statementParser.getSampleStatementLines()
-        val tx = app.statementParser.parseStatementLines(sampleLines)
-        return app.recurringDetector.detectRecurring(tx)
     }
 
     // Parser actions

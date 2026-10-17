@@ -110,7 +110,7 @@ class DefaultRecurringDetector : RecurringDetector {
                             rail = rail,
                             source = SourceType.STATEMENT,
                             sourceApp = "Bank Statement",
-                            last4 = last4 ?: "4821",
+                            last4 = last4,
                             confidence = confidence,
                             confidenceReason = reason
                         )
@@ -133,7 +133,7 @@ class DefaultRecurringDetector : RecurringDetector {
                         rail = rail,
                         source = SourceType.STATEMENT,
                         sourceApp = "Bank Statement",
-                        last4 = last4 ?: "4821",
+                        last4 = last4,
                         confidence = Confidence.HIGH,
                         confidenceReason = "Identified recurring Autopay/Mandate keyword in bank narration"
                     )

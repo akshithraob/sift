@@ -289,5 +289,43 @@ class ParserUnitTest {
         assertEquals("Zerodha Coin (SIP)", detector.normalizeMerchantName("ACH D-ZERODHA BROKING LTD-482109"))
         assertEquals("BESCOM Electricity", detector.normalizeMerchantName("SI-BESCOM ELECTRICITY AUTO DEBIT-4821"))
     }
-}
 
+    @Test
+    fun testDetector_doesNotInventAccountLast4() {
+        val parser = DefaultStatementParser()
+        val detector = DefaultRecurringDetector()
+        val txs = parser.parseStatementLines(parser.getBankSampleLines("SBI"))
+        val detected = detector.detectRecurring(txs)
+
+        assertTrue(detected.isNotEmpty())
+        // SBI sample narrations carry no masked account digits, so none may be fabricated
+        assertTrue(detected.all { it.last4 == null })
+    }
+
+    @Test
+    fun testMerchantNormalizer_upiIdsWithHyphenatedPrefixes() {
+        val detector = DefaultRecurringDetector()
+
+        assertEquals("Disney+ Hotstar", detector.normalizeMerchantName("UPI-MANDATE-HOTSTAR-hotstar@axis/9281948291"))
+        assertEquals("Netflix", detector.normalizeMerchantName("UPI-NETFLIX-netflix.billing@okicici-ICIC0000001-512345678-UPI"))
+        assertEquals("Zomato Gold", detector.normalizeMerchantName("POS 482190 ZOMATO GOLD MUMBAI IN"))
+    }
+
+    @Test
+    fun testScreenshotParser_dailyFrequencyIsNotWeekly() {
+        val parser = DefaultMandateScreenshotParser()
+        val result = parser.parseOcrText(
+            """
+            Autopay
+            Blinkit
+            ₹100
+            Daily
+            Next payment 25 Dec 2099
+            """.trimIndent(),
+            "PhonePe"
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(Frequency.AS_PRESENTED, result[0].frequency)
+    }
+}

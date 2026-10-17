@@ -82,14 +82,15 @@ fun ImportScreen(
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
 
     val isProcessingOcr by viewModel.isProcessingOcr.collectAsState()
+    val importError by viewModel.importError.collectAsState()
 
     // Photo picker for mandate screenshots
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)
     ) { uris ->
         if (uris.isNotEmpty()) {
-            viewModel.processScreenshotUris(uris) {
-                onNavigateToReview()
+            viewModel.processScreenshotUris(uris) { ok ->
+                if (ok) onNavigateToReview()
             }
         }
     }
@@ -104,8 +105,8 @@ fun ImportScreen(
             if (filename.endsWith(".pdf", ignoreCase = true)) {
                 showPasswordDialog = true
             } else {
-                viewModel.processStatementUri(uri) {
-                    onNavigateToReview()
+                viewModel.processStatementUri(uri) { ok ->
+                    if (ok) onNavigateToReview()
                 }
             }
         }
@@ -153,8 +154,9 @@ fun ImportScreen(
                         val pass = pdfPassword
                         showPasswordDialog = false
                         if (uri != null) {
-                            viewModel.processStatementUri(uri, pass) {
-                                onNavigateToReview()
+                            pdfPassword = ""
+                            viewModel.processStatementUri(uri, pass) { ok ->
+                                if (ok) onNavigateToReview()
                             }
                         } else {
                             viewModel.runSampleStatementImport()
@@ -199,6 +201,15 @@ fun ImportScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+
+            importError?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).testTag("import_error")
+                )
+            }
 
             if (isProcessingOcr) {
                 Surface(

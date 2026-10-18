@@ -51,7 +51,14 @@ class ReleaseSafetyInstrumentedTest {
 
     @Test
     fun onlyTheLauncherActivityIsExported() {
-        val exported = packageInfo.activities.orEmpty().filter { it.exported }.map { it.name }
+        // Debug builds also carry Compose's preview/test host activities (debugImplementation only);
+        // a release build must export nothing but the launcher.
+        val debuggable = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val debugOnly = setOf("androidx.compose.ui.tooling.PreviewActivity", "androidx.activity.ComponentActivity")
+        val exported = packageInfo.activities.orEmpty()
+            .filter { it.exported }
+            .map { it.name }
+            .filterNot { debuggable && it in debugOnly }
 
         assertEquals(listOf("com.leakproof.app.MainActivity"), exported)
     }

@@ -55,6 +55,27 @@ Debug builds also seed demo subscriptions and show "Test Sample" import buttons;
 
 Release builds read the signing key from `KEYSTORE_PATH`, `STORE_PASSWORD` and `KEY_PASSWORD`.
 
+## Releasing
+
+1. Create an upload key once and keep it **out of git and backed up** (losing it blocks updates unless you use Play App Signing, which is recommended):
+
+   ```bash
+   keytool -genkeypair -v -keystore my-upload-key.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000
+   ```
+
+2. Provide the signing details through the environment, never in files in the repo:
+
+   ```bash
+   export KEYSTORE_PATH=/secure/path/my-upload-key.jks
+   export STORE_PASSWORD=...
+   export KEY_PASSWORD=...
+   ./gradlew bundleRelease
+   ```
+
+3. The build runs `verifyNoInternetPermission` first and fails if any library puts `android.permission.INTERNET` into the merged manifest. ML Kit's data-transport library does, so the app's manifest removes it explicitly.
+
+4. Before uploading: `./gradlew testDebugUnitTest lintRelease` must pass, and `./gradlew connectedDebugAndroidTest` (with a phone attached) checks the package id, no network permission, backups off and only the launcher activity exported.
+
 ## Contributing
 
 Parser changes need unit tests with realistic but synthetic or redacted samples; never commit real user data. See `CLAUDE.md` for the project context and security requirements.

@@ -382,4 +382,105 @@ class ParserUnitTest {
         // The VPA must never be carried into the candidate
         assertTrue(m.confidenceReason.none { it == '@' })
     }
+
+    private fun ocr(text: String, l: Int, t: Int, r: Int, b: Int) = OcrTextLine(text, OcrBoundingBox(l, t, r, b))
+
+    private fun playSubscriptionsScreen() = OcrDocument(
+        listOf(
+            OcrTextBlock(
+                "",
+                null,
+                listOf(
+                    ocr("Subscriptions", 105, 90, 353, 135),
+                    ocr("Google may share subscription data that doesn't", 45, 190, 617, 225),
+                    ocr("Active", 45, 380, 160, 425),
+                    ocr("Claude by Anthropic", 181, 478, 429, 510),
+                    ocr("Claude Pro Subscription", 181, 514, 426, 542),
+                    ocr("Next payment: ₹1,999.00 on 20 Oct 2026", 181, 545, 594, 572),
+                    ocr("Plan benefits", 60, 645, 219, 675),
+                    ocr("Higher usage for more conversations", 105, 695, 476, 722)
+                )
+            )
+        )
+    )
+
+    private fun googlePayMandateScreen() = OcrDocument(
+        listOf(
+            OcrTextBlock(
+                "",
+                null,
+                listOf(
+                    ocr("Automatic payments", 45, 235, 536, 285),
+                    ocr("Live", 95, 565, 145, 598),
+                    ocr("GOOGLE", 150, 680, 281, 712),
+                    ocr("Up to ₹1,999", 503, 680, 675, 712),
+                    ocr("playstore1.bd@axis...", 150, 722, 407, 756),
+                    ocr("As presented", 506, 722, 675, 756),
+                    ocr("Autopay on • 1 payment completed", 195, 786, 578, 820)
+                )
+            )
+        )
+    )
+
+    @Test
+    fun testScreenshotParser_playStoreSubscriptionsScreen() {
+        val result = DefaultMandateScreenshotParser().parseOcrDocument(playSubscriptionsScreen())
+
+        assertEquals(1, result.size)
+        assertEquals("Claude", result[0].merchant)
+        assertEquals(1999.0, result[0].amount, 0.01)
+        assertEquals("20 Oct 2026", result[0].nextDebitDate)
+        assertEquals(Frequency.MONTHLY, result[0].frequency)
+    }
+
+    @Test
+    fun testScreenshotParser_playStoreExpiredSectionIgnored() {
+        val doc = OcrDocument(
+            listOf(
+                OcrTextBlock(
+                    "",
+                    null,
+                    listOf(
+                        ocr("Active", 45, 380, 160, 425),
+                        ocr("Claude by Anthropic", 181, 478, 429, 510),
+                        ocr("Claude Pro Subscription", 181, 514, 426, 542),
+                        ocr("Next payment: ₹1,999.00 on 20 Oct 2026", 181, 545, 594, 572),
+                        ocr("Expired", 45, 800, 200, 845),
+                        ocr("Old App", 181, 900, 429, 932),
+                        ocr("Old Plan", 181, 936, 426, 964),
+                        ocr("Next payment: ₹199.00 on 01 Jan 2027", 181, 967, 594, 994)
+                    )
+                )
+            )
+        )
+        val result = DefaultMandateScreenshotParser().parseOcrDocument(doc)
+
+        assertEquals(listOf("Claude"), result.map { it.merchant })
+    }
+
+    @Test
+    fun testScreenshotParser_linksGooglePayMandateToPlaySubscription() {
+        val parser = DefaultMandateScreenshotParser()
+        val merged = parser.mergeDuplicates(
+            parser.parseOcrDocument(googlePayMandateScreen(), "Google Pay") +
+                parser.parseOcrDocument(playSubscriptionsScreen())
+        )
+
+        assertEquals(1, merged.size)
+        val m = merged[0]
+        assertEquals("Claude", m.merchant)
+        assertEquals(PaymentRail.UPI, m.rail)
+        assertEquals(1999.0, m.amount, 0.01)
+        assertEquals("20 Oct 2026", m.nextDebitDate)
+        assertTrue(m.confidenceReason.none { it == '@' })
+    }
+
+    @Test
+    fun testScreenshotParser_unlinkedGooglePayMandateAsksForName() {
+        val result = DefaultMandateScreenshotParser().parseOcrDocument(googlePayMandateScreen(), "Google Pay")
+
+        assertEquals(1, result.size)
+        assertEquals("Google Play", result[0].merchant)
+        assertTrue(result[0].confidenceReason.contains("Edit"))
+    }
 }

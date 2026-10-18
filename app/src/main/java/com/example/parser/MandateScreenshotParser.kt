@@ -32,6 +32,7 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
 
     override fun parseOcrDocument(document: OcrDocument, sourceAppHint: String?): List<ParsedMandateCandidate> {
         val nonBlank = document.allLines.filter { it.text.isNotBlank() }
+        parsePlayStoreSubscriptions(nonBlank)?.let { return it }
         // Detect the source app from the whole screen, including header and promo text
         val detectedApp = detectSourceApp(nonBlank.joinToString("\n") { it.text }, sourceAppHint)
         val allLines = nonBlank.filterNot { isNoiseLine(it.text) }
@@ -171,6 +172,9 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
 
         val reason = buildString {
             append("Detected in $detectedApp. ")
+            if (merchant == UNNAMED_PLAY_MANDATE) {
+                append("Google Pay doesn't show which app this is: import your Play Store subscriptions screenshot too, or tap Edit to name it. ")
+            }
             if (maxAmount != null && maxAmount > amount && amount > 0) {
                 append("Current debit: ₹${formatRupees(amount)} (Max: ₹${formatRupees(maxAmount)}). ")
             } else if (maxAmount != null) {
@@ -506,7 +510,102 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
             }
         }
 
-        return merged
+        return linkPlayStoreMandates(merged)
+    }
+
+    private val playNextPayment = Pattern.compile(
+        "next\\s+payment\\s*:?\\s*(?:₹|Rs\\.?|INR)\\s*([0-9,]+(?:\\.[0-9]{1,2})?)\\s*(?:on\\s+)?" +
+            "([0-3]?[0-9]\\s+[A-Za-z]{3,9}\\s+20[2-3][0-9])",
+        Pattern.CASE_INSENSITIVE
+    )
+    private val playSectionHeadings = setOf("active", "expired", "canceled", "cancelled", "inactive", "subscriptions")
+
+    /**
+     * Google Play > Payments & subscriptions > Subscriptions screen. Unlike the Google Pay
+     * Autopay list (which only says "GOOGLE"), this screen names the app and gives the real
+     * price and renewal date. Returns null when the text is not that screen.
+     */
+    private fun parsePlayStoreSubscriptions(allLines: List<OcrTextLine>): List<ParsedMandateCandidate>? {
+        val lines = allLines
+            .sortedBy { it.boundingBox?.top ?: 0 }
+            .map { it.text.trim() }
+        if (lines.none { playNextPayment.matcher(it).find() }) return null
+
+        var activeSection = true
+        val result = mutableListOf<ParsedMandateCandidate>()
+        for ((i, line) in lines.withIndex()) {
+            val lower = line.lowercase()
+            if (lower in playSectionHeadings) {
+                activeSection = lower == "active" || lower == "subscriptions"
+                continue
+            }
+            val m = playNextPayment.matcher(line)
+            if (!m.find() || !activeSection) continue
+
+            val amount = m.group(1)?.replace(",", "")?.toDoubleOrNull() ?: continue
+            val dateStr = m.group(2) ?: continue
+            val plan = lines.getOrNull(i - 1)?.takeIf { it.lowercase() !in playSectionHeadings }
+            val nameLine = lines.getOrNull(i - 2)?.takeIf { it.lowercase() !in playSectionHeadings } ?: plan ?: continue
+            val merchant = nameLine.substringBefore(" by ").trim().ifBlank { continue }
+            val nextMs = parseDateStrToMillis(dateStr)
+
+            result.add(
+                ParsedMandateCandidate(
+                    id = UUID.randomUUID().toString(),
+                    merchant = merchant,
+                    amount = amount,
+                    frequency = extractFrequency("${plan.orEmpty()} $line"),
+                    nextDebitDate = dateStr,
+                    nextDebitDateEpochMs = nextMs,
+                    rail = PaymentRail.OTHER,
+                    source = SourceType.SCREENSHOT,
+                    sourceApp = PLAY_STORE_APP,
+                    confidence = Confidence.HIGH,
+                    confidenceReason = "Active Google Play subscription" +
+                        (plan?.let { " ($it)" } ?: "") + ". Next payment $dateStr."
+                )
+            )
+        }
+        return mergeDuplicates(result)
+    }
+
+    /**
+     * A Google Pay mandate for the Play Store is just "GOOGLE". When exactly one Play
+     * subscription fits under its limit, take the real name, price and date from it.
+     */
+    private fun linkPlayStoreMandates(list: List<ParsedMandateCandidate>): List<ParsedMandateCandidate> {
+        val unnamed = list.filter { it.merchant == UNNAMED_PLAY_MANDATE && it.sourceApp != PLAY_STORE_APP }
+        val named = list.filter { it.sourceApp == PLAY_STORE_APP && it.merchant != UNNAMED_PLAY_MANDATE }
+        if (unnamed.isEmpty() || named.isEmpty()) return list
+
+        fun fits(sub: ParsedMandateCandidate, mandate: ParsedMandateCandidate) =
+            sub.amount <= (mandate.maxAmount ?: mandate.amount) + 0.5
+
+        val replacements = mutableMapOf<String, ParsedMandateCandidate>()
+        val consumed = mutableSetOf<String>()
+        for (mandate in unnamed) {
+            val subs = named.filter { fits(it, mandate) }
+            val sub = subs.singleOrNull() ?: continue
+            if (unnamed.count { fits(sub, it) } != 1) continue
+            replacements[mandate.id] = mandate.copy(
+                merchant = sub.merchant,
+                amount = sub.amount,
+                frequency = sub.frequency,
+                nextDebitDate = sub.nextDebitDate,
+                nextDebitDateEpochMs = sub.nextDebitDateEpochMs,
+                sourceApp = "Google Pay + Google Play",
+                confidence = Confidence.HIGH,
+                confidenceReason = "Autopay mandate found in Google Pay (limit ₹${formatRupees(mandate.maxAmount ?: mandate.amount)}); " +
+                    "name, price and renewal date come from your Google Play subscriptions."
+            )
+            consumed.add(sub.id)
+        }
+        return list.filterNot { it.id in consumed }.map { replacements[it.id] ?: it }
+    }
+
+    private companion object {
+        const val PLAY_STORE_APP = "Google Play"
+        const val UNNAMED_PLAY_MANDATE = "Google Play"
     }
 
     private fun normalizeMerchant(name: String): String {

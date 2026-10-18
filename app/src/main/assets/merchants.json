@@ -1,7 +1,11 @@
 [
   {
     "id": "netflix",
-    "aliases": ["netflix", "netflix entertainment", "netflix india"],
+    "aliases": [
+      "netflix",
+      "netflix entertainment",
+      "netflix india"
+    ],
     "name": "Netflix",
     "category": "Entertainment",
     "cancellationUrl": "https://www.netflix.com/youraccount",
@@ -10,7 +14,11 @@
   },
   {
     "id": "spotify",
-    "aliases": ["spotify", "spotify india", "spotify premium"],
+    "aliases": [
+      "spotify",
+      "spotify india",
+      "spotify premium"
+    ],
     "name": "Spotify Premium",
     "category": "Entertainment",
     "cancellationUrl": "https://www.spotify.com/account/overview/",
@@ -19,7 +27,12 @@
   },
   {
     "id": "hotstar",
-    "aliases": ["hotstar", "disney+ hotstar", "disney plus hotstar", "novi digital"],
+    "aliases": [
+      "hotstar",
+      "disney+ hotstar",
+      "disney plus hotstar",
+      "novi digital"
+    ],
     "name": "Disney+ Hotstar",
     "category": "Entertainment",
     "cancellationUrl": "https://www.hotstar.com/in/my-account",
@@ -28,7 +41,12 @@
   },
   {
     "id": "prime",
-    "aliases": ["amazon prime", "amazon seller", "amazon digital", "prime video"],
+    "aliases": [
+      "amazon prime",
+      "amazon seller",
+      "amazon digital",
+      "prime video"
+    ],
     "name": "Amazon Prime",
     "category": "Entertainment & Shopping",
     "cancellationUrl": "https://www.amazon.in/mc/manage",
@@ -37,7 +55,11 @@
   },
   {
     "id": "youtube",
-    "aliases": ["youtube", "google youtube", "youtube premium"],
+    "aliases": [
+      "youtube",
+      "google youtube",
+      "youtube premium"
+    ],
     "name": "YouTube Premium",
     "category": "Entertainment",
     "cancellationUrl": "https://www.youtube.com/paid_memberships",
@@ -46,7 +68,11 @@
   },
   {
     "id": "swiggy",
-    "aliases": ["swiggy", "swiggy one", "bundl technologies"],
+    "aliases": [
+      "swiggy",
+      "swiggy one",
+      "bundl technologies"
+    ],
     "name": "Swiggy One",
     "category": "Food & Delivery",
     "cancellationUrl": "https://www.swiggy.com",
@@ -55,7 +81,10 @@
   },
   {
     "id": "zomato",
-    "aliases": ["zomato", "zomato gold"],
+    "aliases": [
+      "zomato",
+      "zomato gold"
+    ],
     "name": "Zomato Gold",
     "category": "Food & Dining",
     "cancellationUrl": "https://www.zomato.com",
@@ -64,7 +93,12 @@
   },
   {
     "id": "cultfit",
-    "aliases": ["cultfit", "cult.fit", "curefit", "cure.fit healthcare"],
+    "aliases": [
+      "cultfit",
+      "cult.fit",
+      "curefit",
+      "cure.fit healthcare"
+    ],
     "name": "Cult.fit (Curefit)",
     "category": "Fitness & Health",
     "cancellationUrl": "https://www.cult.fit",
@@ -73,7 +107,11 @@
   },
   {
     "id": "zerodha",
-    "aliases": ["zerodha", "coin by zerodha", "zerodha broking"],
+    "aliases": [
+      "zerodha",
+      "coin by zerodha",
+      "zerodha broking"
+    ],
     "name": "Zerodha Coin (SIP)",
     "category": "Investments",
     "cancellationUrl": "https://coin.zerodha.com",
@@ -82,7 +120,11 @@
   },
   {
     "id": "groww",
-    "aliases": ["groww", "groww invest tech", "nextbillion technology"],
+    "aliases": [
+      "groww",
+      "groww invest tech",
+      "nextbillion technology"
+    ],
     "name": "Groww (SIP Autopay)",
     "category": "Investments",
     "cancellationUrl": "https://groww.in",
@@ -91,7 +133,12 @@
   },
   {
     "id": "airtel",
-    "aliases": ["airtel", "bharti airtel", "airtel broadband", "airtel payments"],
+    "aliases": [
+      "airtel",
+      "bharti airtel",
+      "airtel broadband",
+      "airtel payments"
+    ],
     "name": "Airtel Autopay",
     "category": "Telecom & Broadband",
     "cancellationUrl": "https://www.airtel.in",
@@ -100,7 +147,12 @@
   },
   {
     "id": "jio",
-    "aliases": ["jio", "reliance jio", "jio fiber", "jio infocomm"],
+    "aliases": [
+      "jio",
+      "reliance jio",
+      "jio fiber",
+      "jio infocomm"
+    ],
     "name": "Jio Fiber / Autopay",
     "category": "Telecom & Broadband",
     "cancellationUrl": "https://www.jio.com",
@@ -109,7 +161,10 @@
   },
   {
     "id": "google_one",
-    "aliases": ["google one", "google storage", "google play"],
+    "aliases": [
+      "google one",
+      "google storage"
+    ],
     "name": "Google One Storage",
     "category": "Cloud & Productivity",
     "cancellationUrl": "https://one.google.com/settings",
@@ -118,11 +173,39 @@
   },
   {
     "id": "apple",
-    "aliases": ["apple", "apple.com/bill", "apple services", "itunes"],
+    "aliases": [
+      "apple",
+      "apple.com/bill",
+      "apple services",
+      "itunes"
+    ],
     "name": "Apple Services / iCloud",
     "category": "Cloud & Services",
     "cancellationUrl": "https://support.apple.com/billing",
     "instructions": "On iPhone: Settings > [Your Name] > Subscriptions > Select subscription > Cancel Subscription.",
     "supportContact": "support.apple.com"
+  },
+  {
+    "id": "claude",
+    "aliases": [
+      "claude",
+      "anthropic"
+    ],
+    "name": "Claude",
+    "category": "AI & Productivity",
+    "cancellationUrl": "https://play.google.com/store/account/subscriptions",
+    "instructions": "If you subscribed through Google Play: open Google Play Store > Profile icon > Payments & subscriptions > Subscriptions > Claude > Cancel subscription. If you subscribed on claude.ai or the iOS app, manage it from Settings > Billing there instead.",
+    "supportContact": "support.anthropic.com"
+  },
+  {
+    "id": "google_play",
+    "aliases": [
+      "google play"
+    ],
+    "name": "Google Play",
+    "category": "Apps & Subscriptions",
+    "cancellationUrl": "https://play.google.com/store/account/subscriptions",
+    "instructions": "Open Google Play Store > Profile icon > Payments & subscriptions > Subscriptions, pick the app and tap Cancel subscription. This is the only place a Play Store subscription can be cancelled; the Autopay entry in your UPI app only shows 'GOOGLE'.",
+    "supportContact": "support.google.com/googleplay"
   }
 ]

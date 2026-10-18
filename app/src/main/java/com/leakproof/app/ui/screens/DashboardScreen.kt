@@ -219,7 +219,7 @@ fun DashboardScreen(
             }
 
             item {
-                SectionTitle("All subscriptions") {
+                SectionTitle("All recurring payments") {
                     Text(
                         text = "${subscriptions.size}",
                         fontSize = 13.sp,

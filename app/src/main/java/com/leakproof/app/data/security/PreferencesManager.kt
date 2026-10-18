@@ -10,7 +10,6 @@ class PreferencesManager(context: Context) {
         private const val KEY_ONBOARDING_DONE = "key_onboarding_done"
         private const val KEY_APP_LOCK_ENABLED = "key_app_lock_enabled"
         private const val KEY_NOTIFICATIONS_ENABLED = "key_notifications_enabled"
-        private const val KEY_FIRST_RUN_SEEDED = "key_first_run_seeded"
         private const val KEY_MONTHLY_BUDGET = "key_monthly_budget"
         private const val KEY_LAST_IMPORT_MS = "key_last_import_ms"
         private const val KEY_LAST_REIMPORT_NUDGE_MS = "key_last_reimport_nudge_ms"
@@ -27,10 +26,6 @@ class PreferencesManager(context: Context) {
     var isNotificationsEnabled: Boolean
         get() = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, value).apply()
-
-    var isFirstRunSeeded: Boolean
-        get() = prefs.getBoolean(KEY_FIRST_RUN_SEEDED, false)
-        set(value) = prefs.edit().putBoolean(KEY_FIRST_RUN_SEEDED, value).apply()
 
     /** Monthly subscription budget in rupees; 0 means no budget set. */
     var monthlyBudget: Double

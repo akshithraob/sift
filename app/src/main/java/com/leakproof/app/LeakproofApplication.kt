@@ -11,10 +11,6 @@ import com.leakproof.app.parser.DefaultStatementParser
 import com.leakproof.app.parser.MandateScreenshotParser
 import com.leakproof.app.parser.RecurringDetector
 import com.leakproof.app.parser.StatementParser
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 class LeakproofApplication : Application() {
 
@@ -50,20 +46,6 @@ class LeakproofApplication : Application() {
         merchantRepository = MerchantRepository(this)
 
         com.leakproof.app.reminder.RenewalReminderWorker.schedule(this, preferencesManager.isNotificationsEnabled)
-
-        // Demo data is seeded in debug builds only; release users start with an empty vault
-        if (BuildConfig.DEBUG) CoroutineScope(Dispatchers.IO).launch {
-            try {
-                if (!preferencesManager.isFirstRunSeeded) {
-                    val currentList = subscriptionRepository.getAllSubscriptions().first()
-                    if (currentList.isEmpty()) {
-                        subscriptionRepository.seedInitialDataIfEmpty()
-                    }
-                    preferencesManager.isFirstRunSeeded = true
-                }
-            } catch (_: Exception) {
-            }
-        }
     }
 
     companion object {

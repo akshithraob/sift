@@ -63,7 +63,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.leakproof.app.BuildConfig
 import com.leakproof.app.ui.theme.BrandPrimary
 import com.leakproof.app.ui.theme.RailNach
 import com.leakproof.app.ui.theme.RailUpi
@@ -277,11 +276,6 @@ fun ImportScreen(
                     )
                 },
                 primaryButtonText = "Select Screenshots",
-                onSimulateAction = {
-                    viewModel.runSampleScreenshotImport()
-                    onNavigateToReview()
-                },
-                simulateButtonText = "Test Sample Screenshots",
                 testTagPrefix = "screenshot"
             )
 
@@ -301,11 +295,6 @@ fun ImportScreen(
                     )
                 },
                 primaryButtonText = "Select PDF / CSV",
-                onSimulateAction = {
-                    viewModel.runSampleStatementImport()
-                    onNavigateToReview()
-                },
-                simulateButtonText = "Test Sample Statement",
                 testTagPrefix = "statement"
             )
 
@@ -382,8 +371,6 @@ private fun ImportActionCard(
     iconTint: androidx.compose.ui.graphics.Color,
     onPrimaryAction: () -> Unit,
     primaryButtonText: String,
-    onSimulateAction: () -> Unit,
-    simulateButtonText: String,
     testTagPrefix: String
 ) {
     Card(
@@ -460,26 +447,6 @@ private fun ImportActionCard(
                 Text(primaryButtonText, fontWeight = FontWeight.Bold)
             }
 
-            // Sample-data shortcuts exist for development only
-            if (BuildConfig.DEBUG) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedButton(
-                    onClick = onSimulateAction,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("${testTagPrefix}_simulate_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(simulateButtonText, fontSize = 13.sp)
-                }
-            }
         }
     }
 }

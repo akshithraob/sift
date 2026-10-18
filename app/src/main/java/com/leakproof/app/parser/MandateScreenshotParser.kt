@@ -10,7 +10,6 @@ interface MandateScreenshotParser {
     fun parseOcrDocument(document: OcrDocument, sourceAppHint: String? = null): List<ParsedMandateCandidate>
     fun parseOcrText(ocrText: String, sourceAppHint: String? = null): List<ParsedMandateCandidate>
     fun mergeDuplicates(candidates: List<ParsedMandateCandidate>): List<ParsedMandateCandidate>
-    fun getSampleCandidates(): List<ParsedMandateCandidate>
 }
 
 class DefaultMandateScreenshotParser : MandateScreenshotParser {
@@ -619,58 +618,4 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
             .replace("autopay", "")
     }
 
-    override fun getSampleCandidates(): List<ParsedMandateCandidate> {
-        return listOf(
-            ParsedMandateCandidate(
-                id = UUID.randomUUID().toString(),
-                merchant = "Netflix India",
-                amount = 649.00,
-                maxAmount = 1000.00,
-                frequency = Frequency.MONTHLY,
-                startDate = "15 Jan 2024",
-                endDate = "Until Revoked",
-                nextDebitDate = "24 Oct 2026",
-                nextDebitDateEpochMs = System.currentTimeMillis() + (7L * 24 * 3600 * 1000),
-                rail = PaymentRail.UPI,
-                source = SourceType.SCREENSHOT,
-                sourceApp = "Google Pay",
-                last4 = "4821",
-                confidence = Confidence.HIGH,
-                confidenceReason = "Extracted from Google Pay Autopay list card. Amount ₹649 (Max ₹1000)."
-            ),
-            ParsedMandateCandidate(
-                id = UUID.randomUUID().toString(),
-                merchant = "Spotify Premium",
-                amount = 119.00,
-                frequency = Frequency.MONTHLY,
-                startDate = "01 Mar 2024",
-                endDate = "Until Revoked",
-                nextDebitDate = "20 Oct 2026",
-                nextDebitDateEpochMs = System.currentTimeMillis() + (3L * 24 * 3600 * 1000),
-                rail = PaymentRail.UPI,
-                source = SourceType.SCREENSHOT,
-                sourceApp = "PhonePe",
-                last4 = "9012",
-                confidence = Confidence.HIGH,
-                confidenceReason = "Extracted from PhonePe Autopay card. Monthly frequency on 20th."
-            ),
-            ParsedMandateCandidate(
-                id = UUID.randomUUID().toString(),
-                merchant = "Disney+ Hotstar",
-                amount = 1499.00,
-                maxAmount = 2000.00,
-                frequency = Frequency.YEARLY,
-                startDate = "15 Nov 2024",
-                endDate = "15 Nov 2029",
-                nextDebitDate = "15 Nov 2026",
-                nextDebitDateEpochMs = System.currentTimeMillis() + (29L * 24 * 3600 * 1000),
-                rail = PaymentRail.UPI,
-                source = SourceType.SCREENSHOT,
-                sourceApp = "Paytm",
-                last4 = "3310",
-                confidence = Confidence.HIGH,
-                confidenceReason = "Extracted from Paytm Automatic Payments. Annual cycle ₹1,499."
-            )
-        )
-    }
 }

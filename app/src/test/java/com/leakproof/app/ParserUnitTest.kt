@@ -187,7 +187,7 @@ class ParserUnitTest {
         val parser = DefaultStatementParser()
         val detector = DefaultRecurringDetector()
 
-        val sbiLines = parser.getBankSampleLines("SBI")
+        val sbiLines = SampleStatements.bankLines("SBI")
         val txs = parser.parseStatementLines(sbiLines)
 
         // Verify extraction of date, debit, credit
@@ -215,7 +215,7 @@ class ParserUnitTest {
         val parser = DefaultStatementParser()
         val detector = DefaultRecurringDetector()
 
-        val hdfcLines = parser.getBankSampleLines("HDFC")
+        val hdfcLines = SampleStatements.bankLines("HDFC")
         val txs = parser.parseStatementLines(hdfcLines)
 
         assertTrue(txs.isNotEmpty())
@@ -233,7 +233,7 @@ class ParserUnitTest {
         val parser = DefaultStatementParser()
         val detector = DefaultRecurringDetector()
 
-        val iciciLines = parser.getBankSampleLines("ICICI")
+        val iciciLines = SampleStatements.bankLines("ICICI")
         val txs = parser.parseStatementLines(iciciLines)
 
         assertTrue(txs.isNotEmpty())
@@ -259,7 +259,7 @@ class ParserUnitTest {
         val parser = DefaultStatementParser()
         val detector = DefaultRecurringDetector()
 
-        val axisLines = parser.getBankSampleLines("AXIS")
+        val axisLines = SampleStatements.bankLines("AXIS")
         val txs = parser.parseStatementLines(axisLines)
 
         assertTrue(txs.isNotEmpty())
@@ -294,7 +294,7 @@ class ParserUnitTest {
     fun testDetector_doesNotInventAccountLast4() {
         val parser = DefaultStatementParser()
         val detector = DefaultRecurringDetector()
-        val txs = parser.parseStatementLines(parser.getBankSampleLines("SBI"))
+        val txs = parser.parseStatementLines(SampleStatements.bankLines("SBI"))
         val detected = detector.detectRecurring(txs)
 
         assertTrue(detected.isNotEmpty())

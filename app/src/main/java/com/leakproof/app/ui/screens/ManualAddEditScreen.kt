@@ -68,7 +68,12 @@ fun ManualAddEditScreen(
     var amountText by remember { mutableStateOf(existing?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
     var frequency by remember { mutableStateOf(existing?.frequency ?: "MONTHLY") }
     var rail by remember { mutableStateOf(existing?.rail ?: "UPI") }
-    var nextDate by remember { mutableStateOf(existing?.nextDate ?: "24 Oct 2026") }
+    var nextDate by remember {
+        mutableStateOf(
+            existing?.nextDate ?: java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH)
+                .format(java.util.Date(System.currentTimeMillis() + 30L * 24 * 3600 * 1000))
+        )
+    }
     var last4 by remember { mutableStateOf(existing?.last4 ?: "") }
     var notes by remember { mutableStateOf(existing?.notes ?: "") }
 

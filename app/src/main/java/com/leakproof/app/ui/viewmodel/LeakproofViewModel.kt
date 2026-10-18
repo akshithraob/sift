@@ -374,30 +374,6 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Parser actions
-    fun parseScreenshotOcr(ocrText: String, sourceAppHint: String? = null) {
-        val candidates = app.screenshotParser.parseOcrText(ocrText, sourceAppHint)
-        _pendingCandidates.value = candidates
-    }
-
-    fun parseStatementText(lines: List<String>) {
-        val rawTx = app.statementParser.parseStatementLines(lines)
-        val candidates = app.recurringDetector.detectRecurring(rawTx)
-        _pendingCandidates.value = candidates
-    }
-
-    fun runSampleScreenshotImport() {
-        val candidates = app.screenshotParser.getSampleCandidates()
-        _pendingCandidates.value = candidates
-    }
-
-    fun runSampleStatementImport() {
-        val sampleLines = app.statementParser.getSampleStatementLines()
-        val tx = app.statementParser.parseStatementLines(sampleLines)
-        val candidates = app.recurringDetector.detectRecurring(tx)
-        _pendingCandidates.value = candidates
-    }
-
     // Wipe all data & cryptographic keys
     fun wipeAllData(onComplete: () -> Unit) {
         viewModelScope.launch {

@@ -2,6 +2,7 @@ package com.example.data.repository
 
 import com.example.data.local.SubscriptionDao
 import com.example.data.local.SubscriptionEntity
+import com.example.insights.ImportDiff
 import com.example.parser.ParsedMandateCandidate
 import kotlinx.coroutines.flow.Flow
 
@@ -25,22 +26,56 @@ class SubscriptionRepository(private val dao: SubscriptionDao) {
 
     suspend fun updateStatus(id: Long, status: String) = dao.updateStatus(id, status)
 
-    suspend fun saveConfirmedCandidates(candidates: List<ParsedMandateCandidate>): List<Long> {
-        val entities = candidates.map { candidate ->
-            SubscriptionEntity(
-                merchant = candidate.merchant,
-                amount = candidate.amount,
-                frequency = candidate.frequency.name,
-                nextDate = candidate.nextDebitDate ?: "Upcoming",
-                nextDateEpochMs = candidate.nextDebitDateEpochMs ?: (System.currentTimeMillis() + 7L * 24 * 3600 * 1000),
-                rail = candidate.rail.name,
-                source = candidate.source.name,
-                last4 = candidate.last4?.takeLast(4),
-                status = "ACTIVE",
-                userConfirmed = true
+    /**
+     * Saves reviewed candidates. A candidate for a service we already track updates that entry
+     * (new price, date, limit) instead of creating a duplicate; the rest are inserted.
+     * [cancelIds] are mandates the user chose to mark cancelled because the import no longer shows them.
+     */
+    suspend fun saveConfirmedCandidates(
+        candidates: List<ParsedMandateCandidate>,
+        cancelIds: List<Long> = emptyList()
+    ): List<Long> {
+        val now = System.currentTimeMillis()
+        val diff = ImportDiff.compare(dao.getAllOnce(), candidates)
+
+        for (match in diff.matches) {
+            val c = match.candidate
+            val old = match.existing
+            dao.updateSubscription(
+                old.copy(
+                    amount = c.amount,
+                    frequency = c.frequency.name,
+                    nextDate = c.nextDebitDate ?: old.nextDate,
+                    nextDateEpochMs = c.nextDebitDateEpochMs ?: old.nextDateEpochMs,
+                    last4 = c.last4?.takeLast(4) ?: old.last4,
+                    status = "ACTIVE",
+                    maxAmount = c.maxAmount ?: old.maxAmount,
+                    lastSeenAtMs = now
+                )
             )
         }
-        return dao.insertAll(entities)
+
+        val inserted = dao.insertAll(
+            diff.newCandidates.map { candidate ->
+                SubscriptionEntity(
+                    merchant = candidate.merchant,
+                    amount = candidate.amount,
+                    frequency = candidate.frequency.name,
+                    nextDate = candidate.nextDebitDate ?: "Upcoming",
+                    nextDateEpochMs = candidate.nextDebitDateEpochMs ?: (now + 7L * 24 * 3600 * 1000),
+                    rail = candidate.rail.name,
+                    source = candidate.source.name,
+                    last4 = candidate.last4?.takeLast(4),
+                    status = "ACTIVE",
+                    userConfirmed = true,
+                    maxAmount = candidate.maxAmount,
+                    lastSeenAtMs = now
+                )
+            }
+        )
+
+        if (cancelIds.isNotEmpty()) dao.cancelByIds(cancelIds)
+        return inserted
     }
 
     suspend fun seedInitialDataIfEmpty() {

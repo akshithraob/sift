@@ -20,6 +20,15 @@ interface SubscriptionDao {
     @Query("SELECT * FROM subscriptions WHERE status = 'ACTIVE' AND nextDateEpochMs >= :from AND nextDateEpochMs < :to")
     suspend fun getActiveRenewingBetween(from: Long, to: Long): List<SubscriptionEntity>
 
+    @Query("SELECT * FROM subscriptions")
+    suspend fun getAllOnce(): List<SubscriptionEntity>
+
+    @Query("SELECT * FROM subscriptions WHERE status = 'ACTIVE' AND trialEndEpochMs >= :from AND trialEndEpochMs < :to")
+    suspend fun getActiveTrialsEndingBetween(from: Long, to: Long): List<SubscriptionEntity>
+
+    @Query("UPDATE subscriptions SET status = 'CANCELLED' WHERE id IN (:ids)")
+    suspend fun cancelByIds(ids: List<Long>)
+
     @Query("SELECT * FROM subscriptions WHERE id = :id LIMIT 1")
     suspend fun getSubscriptionById(id: Long): SubscriptionEntity?
 

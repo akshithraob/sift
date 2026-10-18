@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.material3.OutlinedTextField
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -303,6 +304,56 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier.testTag("toggle_notifications")
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Budget Section
+            SettingsSectionHeader(title = "BUDGET")
+
+            val savedBudget by viewModel.monthlyBudget.collectAsState()
+            var budgetText by remember(savedBudget) {
+                mutableStateOf(if (savedBudget > 0) savedBudget.toLong().toString() else "")
+            }
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Monthly subscription budget",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "The dashboard shows how close your monthly spend is to this amount. Leave empty for no budget.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = budgetText,
+                            onValueChange = { text -> budgetText = text.filter { it.isDigit() }.take(7) },
+                            label = { Text("Budget (\u20B9 per month)") },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            ),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("budget_input_field")
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Button(
+                            onClick = { viewModel.setMonthlyBudget(budgetText.toDoubleOrNull() ?: 0.0) },
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                            modifier = Modifier.testTag("save_budget_button")
+                        ) {
+                            Text("Save")
+                        }
+                    }
                 }
             }
 

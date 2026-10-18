@@ -1,5 +1,6 @@
 package com.example.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -17,5 +18,9 @@ data class SubscriptionEntity(
     val last4: String?,    // Maximum 4 digits only, never full account/VPA
     val status: String,    // ACTIVE, PAUSED, CANCELLED
     val userConfirmed: Boolean = true,
-    val notes: String? = null
+    val notes: String? = null,
+    val maxAmount: Double? = null,          // Mandate limit ("up to"), when the source shows one
+    val trialEndEpochMs: Long? = null,      // Set for free trials; drives the "trial ends" reminder
+    @ColumnInfo(defaultValue = "0")
+    val lastSeenAtMs: Long = 0              // Last time an import still showed this mandate
 )

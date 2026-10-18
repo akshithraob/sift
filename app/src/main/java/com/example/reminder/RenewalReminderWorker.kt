@@ -16,14 +16,15 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.example.MainActivity
 import com.example.data.local.AppDatabase
+import com.example.data.security.PreferencesManager
 import com.example.util.CurrencyFormatter
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 /**
- * Local-only renewal reminders: once a day, notifies about active subscriptions renewing in
- * [DAYS_BEFORE] days. Nothing leaves the device; the lock-screen version of the notification
- * is generic so merchant names and amounts stay private.
+ * Local-only reminders, run once a day: renewals in [DAYS_BEFORE] days, free trials ending today or
+ * tomorrow, and a monthly nudge to re-import so the list stays current. Nothing leaves the device;
+ * the lock-screen version of every notification is generic so merchant names and amounts stay private.
  */
 class RenewalReminderWorker(
     private val context: Context,
@@ -33,24 +34,57 @@ class RenewalReminderWorker(
     override suspend fun doWork(): Result {
         if (!canNotify(context)) return Result.success()
 
-        val dayStart = startOfDay(DAYS_BEFORE)
-        val dayEnd = startOfDay(DAYS_BEFORE + 1)
-        val due = try {
-            AppDatabase.getInstance(context).subscriptionDao().getActiveRenewingBetween(dayStart, dayEnd)
+        val dao = try {
+            AppDatabase.getInstance(context).subscriptionDao()
         } catch (_: Exception) {
             return Result.retry()
         }
-        if (due.isEmpty()) return Result.success()
 
+        try {
+            val renewals = dao.getActiveRenewingBetween(startOfDay(DAYS_BEFORE), startOfDay(DAYS_BEFORE + 1))
+            if (renewals.isNotEmpty()) {
+                val title = if (renewals.size == 1) "1 subscription renews in $DAYS_BEFORE days"
+                else "${renewals.size} subscriptions renew in $DAYS_BEFORE days"
+                post(NOTIFICATION_RENEWALS, title, renewals.joinToString(", ") { "${it.merchant} (${CurrencyFormatter.format(it.amount)})" })
+            }
+
+            val trials = dao.getActiveTrialsEndingBetween(startOfDay(0), startOfDay(2))
+            if (trials.isNotEmpty()) {
+                val title = if (trials.size == 1) "A free trial is ending" else "${trials.size} free trials are ending"
+                post(
+                    NOTIFICATION_TRIALS, title,
+                    trials.joinToString("; ") { "${it.merchant} converts to ${CurrencyFormatter.format(it.amount)} - cancel to avoid the charge" }
+                )
+            }
+        } catch (_: Exception) {
+            return Result.retry()
+        }
+
+        nudgeToReimport()
+        return Result.success()
+    }
+
+    private fun nudgeToReimport() {
+        val prefs = PreferencesManager(context)
+        val now = System.currentTimeMillis()
+        val stale = prefs.lastImportAtMs > 0 && now - prefs.lastImportAtMs > REIMPORT_AFTER_MS
+        val alreadyNudged = now - prefs.lastReimportNudgeAtMs < REIMPORT_AFTER_MS
+        if (stale && !alreadyNudged) {
+            post(
+                NOTIFICATION_REIMPORT, "Refresh your subscriptions",
+                "It's been a month. Import a fresh Autopay screenshot to catch new, changed or cancelled mandates."
+            )
+            prefs.lastReimportNudgeAtMs = now
+        }
+    }
+
+    private fun post(id: Int, title: String, detail: String) {
         ensureChannel(context)
-        val title = if (due.size == 1) "1 subscription renews in $DAYS_BEFORE days"
-        else "${due.size} subscriptions renew in $DAYS_BEFORE days"
-        val detail = due.joinToString(", ") { "${it.merchant} (${CurrencyFormatter.format(it.amount)})" }
 
         val publicVersion = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("SubTrack")
-            .setContentText("Upcoming renewal")
+            .setContentText("You have an update")
             .build()
 
         val openApp = android.app.PendingIntent.getActivity(
@@ -69,8 +103,7 @@ class RenewalReminderWorker(
             .setAutoCancel(true)
             .build()
 
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
-        return Result.success()
+        NotificationManagerCompat.from(context).notify(id, notification)
     }
 
     private fun startOfDay(daysFromToday: Int): Long {
@@ -85,8 +118,11 @@ class RenewalReminderWorker(
 
     companion object {
         const val DAYS_BEFORE = 2
+        private const val REIMPORT_AFTER_MS = 30L * 24 * 3600 * 1000
         private const val CHANNEL_ID = "renewal_reminders"
-        private const val NOTIFICATION_ID = 1001
+        private const val NOTIFICATION_RENEWALS = 1001
+        private const val NOTIFICATION_TRIALS = 1002
+        private const val NOTIFICATION_REIMPORT = 1003
         private const val WORK_NAME = "renewal_reminders_daily"
 
         fun canNotify(context: Context): Boolean =
@@ -97,7 +133,7 @@ class RenewalReminderWorker(
         private fun ensureChannel(context: Context) {
             if (Build.VERSION.SDK_INT >= 26) {
                 val channel = NotificationChannel(
-                    CHANNEL_ID, "Renewal reminders", NotificationManager.IMPORTANCE_DEFAULT
+                    CHANNEL_ID, "Reminders", NotificationManager.IMPORTANCE_DEFAULT
                 ).apply { lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE }
                 context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
             }

@@ -50,6 +50,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.local.SubscriptionEntity
+import com.example.insights.MatchedCandidate
 import com.example.parser.Confidence
 import com.example.parser.Frequency
 import com.example.parser.ParsedMandateCandidate
@@ -68,6 +70,8 @@ fun ReviewScreen(
     onSavedSuccessfully: () -> Unit
 ) {
     val candidates by viewModel.pendingCandidates.collectAsState()
+    val diff by viewModel.importDiff.collectAsState()
+    val missingToCancel by viewModel.missingToCancel.collectAsState()
     var editingCandidate by remember { mutableStateOf<ParsedMandateCandidate?>(null) }
 
     if (editingCandidate != null) {
@@ -171,7 +175,7 @@ fun ReviewScreen(
 
                         Button(
                             onClick = {
-                                viewModel.confirmCandidates(candidates) {
+                                viewModel.confirmCandidates(candidates, applyCancellations = true) {
                                     onSavedSuccessfully()
                                 }
                             },
@@ -234,8 +238,20 @@ fun ReviewScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                diff?.let { d ->
+                    if (d.matches.isNotEmpty() || d.missing.isNotEmpty()) {
+                        item(key = "diff_summary") {
+                            ImportDiffSummary(
+                                newCount = d.newCandidates.size,
+                                changedCount = d.matches.count { it.hasChanges },
+                                alreadyTrackedCount = d.matches.count { !it.hasChanges }
+                            )
+                        }
+                    }
+                }
                 items(candidates, key = { it.id }) { candidate ->
                     CandidateReviewCard(
+                        diffNote = diff?.matchFor(candidate.id)?.let { diffNote(it) },
                         candidate = candidate,
                         onConfirm = {
                             viewModel.confirmCandidates(listOf(candidate)) {
@@ -252,6 +268,85 @@ fun ReviewScreen(
                         }
                     )
                 }
+                diff?.missing?.takeIf { it.isNotEmpty() }?.let { missing ->
+                    item(key = "missing_section") {
+                        MissingMandatesCard(
+                            missing = missing,
+                            selected = missingToCancel,
+                            onToggle = { viewModel.toggleMissingToCancel(it) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun diffNote(match: MatchedCandidate): String = when {
+    match.amountChanged && match.dateChanged ->
+        "Already tracked: price ${CurrencyFormatter.format(match.existing.amount)} → ${CurrencyFormatter.format(match.candidate.amount)}, date updated"
+    match.amountChanged ->
+        "Already tracked: price ${CurrencyFormatter.format(match.existing.amount)} → ${CurrencyFormatter.format(match.candidate.amount)}"
+    match.dateChanged -> "Already tracked: renewal date updated"
+    else -> "Already tracked, no changes"
+}
+
+@Composable
+private fun ImportDiffSummary(newCount: Int, changedCount: Int, alreadyTrackedCount: Int) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = BrandPrimary.copy(alpha = 0.12f),
+        modifier = Modifier.fillMaxWidth().testTag("import_diff_summary")
+    ) {
+        Text(
+            text = "Compared with what you already track: $newCount new, $changedCount changed, " +
+                "$alreadyTrackedCount already tracked. Existing entries are updated, not duplicated.",
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(12.dp)
+        )
+    }
+}
+
+@Composable
+private fun MissingMandatesCard(
+    missing: List<SubscriptionEntity>,
+    selected: Set<Long>,
+    onToggle: (Long) -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth().testTag("missing_mandates_card")
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "No longer in this import",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "These were imported from a UPI app before but aren't in this screenshot. " +
+                    "If you cancelled them, tick them to mark as cancelled. Leave unticked if your screenshot only covers part of the list.",
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            missing.forEach { sub ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().testTag("missing_row_${sub.id}")
+                ) {
+                    androidx.compose.material3.Checkbox(checked = sub.id in selected, onCheckedChange = { onToggle(sub.id) })
+                    Text(
+                        text = "${sub.merchant}  ${CurrencyFormatter.format(sub.amount)}",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     }
@@ -260,6 +355,7 @@ fun ReviewScreen(
 @Composable
 fun CandidateReviewCard(
     candidate: ParsedMandateCandidate,
+    diffNote: String? = null,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     onEdit: () -> Unit
@@ -281,6 +377,17 @@ fun CandidateReviewCard(
             ) {
                 PaymentRailBadge(rail = candidate.rail.name)
                 ConfidenceBadge(confidence = candidate.confidence)
+            }
+
+            if (diffNote != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = diffNote,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BrandPrimary,
+                    modifier = Modifier.testTag("diff_note_${candidate.id}")
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))

@@ -61,7 +61,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.SubscriptionEntity
+import com.example.insights.Budget
+import com.example.insights.MandateRiskAnalyzer
+import com.example.insights.OverlapDetector
+import com.example.insights.Trials
 import com.example.ui.components.PaymentRailBadge
+import com.example.ui.components.insightItems
 import com.example.ui.components.StatusBadge
 import com.example.ui.theme.BrandPrimary
 import com.example.ui.theme.StatusPaused
@@ -95,6 +100,13 @@ fun DashboardScreen(
         }
     }
     val totalYearly = totalMonthly * 12.0
+
+    // Insights: budget, trials, overlapping services, risky mandate limits
+    val monthlyBudget by viewModel.monthlyBudget.collectAsState()
+    val budgetStatus = Budget.evaluate(totalMonthly, monthlyBudget)
+    val activeTrials = Trials.activeTrials(subscriptions)
+    val overlaps = OverlapDetector.detect(subscriptions)
+    val risks = MandateRiskAnalyzer.analyze(subscriptions)
 
     // Upcoming in next 7 days
     val now = System.currentTimeMillis()
@@ -324,6 +336,8 @@ fun DashboardScreen(
                 }
             }
 
+            insightItems(budgetStatus, activeTrials, overlaps, risks)
+
             // Search Bar
             item {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -542,6 +556,18 @@ fun SubscriptionItemCard(
                 }
 
                 StatusBadge(status = subscription.status)
+            }
+
+            val trialEnd = subscription.trialEndEpochMs
+            if (trialEnd != null && subscription.status == "ACTIVE" && Trials.daysUntil(trialEnd) >= 0) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = Trials.label(Trials.daysUntil(trialEnd)),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = StatusPaused,
+                    modifier = Modifier.testTag("trial_label_${subscription.id}")
+                )
             }
         }
     }

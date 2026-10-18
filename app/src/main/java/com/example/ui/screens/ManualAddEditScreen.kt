@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -70,6 +71,12 @@ fun ManualAddEditScreen(
     var nextDate by remember { mutableStateOf(existing?.nextDate ?: "24 Oct 2026") }
     var last4 by remember { mutableStateOf(existing?.last4 ?: "") }
     var notes by remember { mutableStateOf(existing?.notes ?: "") }
+
+    val dateFormat = remember { java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH).apply { isLenient = false } }
+    var isTrial by remember { mutableStateOf(existing?.trialEndEpochMs != null) }
+    var trialEndText by remember {
+        mutableStateOf(existing?.trialEndEpochMs?.let { dateFormat.format(java.util.Date(it)) } ?: "")
+    }
 
     var frequencyExpanded by remember { mutableStateOf(false) }
     var railExpanded by remember { mutableStateOf(false) }
@@ -268,6 +275,40 @@ fun ManualAddEditScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            // Free trial
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("This is a free trial", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(
+                        "We'll remind you before it converts into a paid plan.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                androidx.compose.material3.Switch(
+                    checked = isTrial,
+                    onCheckedChange = { isTrial = it; errorMessage = null },
+                    modifier = Modifier.testTag("trial_switch")
+                )
+            }
+            if (isTrial) {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = trialEndText,
+                    onValueChange = { trialEndText = it; errorMessage = null },
+                    label = { Text("Trial ends on") },
+                    placeholder = { Text("e.g. 25 Oct 2026") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("trial_end_input_field")
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             // Last 4 Digits of Account
             OutlinedTextField(
                 value = last4,
@@ -320,12 +361,24 @@ fun ManualAddEditScreen(
                         return@Button
                     }
 
+                    val trialEndMs: Long? = if (isTrial) {
+                        val parsed = runCatching { dateFormat.parse(trialEndText.trim())?.time }.getOrNull()
+                        if (parsed == null) {
+                            errorMessage = "Enter the trial end date like 25 Oct 2026"
+                            return@Button
+                        }
+                        parsed
+                    } else null
+                    val nextDateMs = runCatching { dateFormat.parse(nextDate.trim())?.time }.getOrNull()
+
                     viewModel.addOrUpdateSubscription(
                         id = existing?.id ?: 0L,
                         merchant = merchant.trim(),
                         amount = amountVal,
                         frequency = frequency,
                         nextDate = nextDate.trim().ifBlank { "Upcoming" },
+                        nextDateEpochMs = nextDateMs,
+                        trialEndEpochMs = trialEndMs,
                         rail = rail,
                         source = existing?.source ?: "MANUAL",
                         last4 = last4.ifBlank { null },

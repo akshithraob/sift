@@ -12,7 +12,10 @@ import com.example.parser.Frequency
 import com.example.parser.ParsedMandateCandidate
 import com.example.parser.PaymentRail
 import com.example.parser.SourceType
+import com.example.insights.ImportDiff
+import com.example.insights.ImportDiffResult
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -120,12 +123,47 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun confirmCandidates(candidatesToSave: List<ParsedMandateCandidate>, onComplete: () -> Unit) {
+    // Review-screen insight: what this import adds, changes, or no longer shows
+    val importDiff: StateFlow<ImportDiffResult?> =
+        combine(_pendingCandidates, allSubscriptions) { pending, existing ->
+            if (pending.isEmpty()) null else ImportDiff.compare(existing, pending)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // Mandates the user ticked as "cancelled" because the import no longer shows them
+    private val _missingToCancel = MutableStateFlow<Set<Long>>(emptySet())
+    val missingToCancel: StateFlow<Set<Long>> = _missingToCancel.asStateFlow()
+
+    fun toggleMissingToCancel(id: Long) {
+        _missingToCancel.value = _missingToCancel.value.let { if (id in it) it - id else it + id }
+    }
+
+    /** [applyCancellations] is true only for "Confirm All", which finishes the whole import. */
+    fun confirmCandidates(
+        candidatesToSave: List<ParsedMandateCandidate>,
+        applyCancellations: Boolean = false,
+        onComplete: () -> Unit
+    ) {
         viewModelScope.launch {
-            repository.saveConfirmedCandidates(candidatesToSave)
-            _pendingCandidates.value = emptyList()
+            val cancelIds = if (applyCancellations) {
+                val missingIds = importDiff.value?.missing?.map { it.id }?.toSet().orEmpty()
+                _missingToCancel.value.filter { it in missingIds }
+            } else emptyList()
+            repository.saveConfirmedCandidates(candidatesToSave, cancelIds)
+            prefs.lastImportAtMs = System.currentTimeMillis()
+            val savedIds = candidatesToSave.map { it.id }.toSet()
+            _pendingCandidates.value = _pendingCandidates.value.filter { it.id !in savedIds }
+            if (applyCancellations || _pendingCandidates.value.isEmpty()) _missingToCancel.value = emptySet()
             onComplete()
         }
+    }
+
+    // Insights for the dashboard
+    val monthlyBudget = MutableStateFlow(prefs.monthlyBudget)
+
+    fun setMonthlyBudget(amount: Double) {
+        val value = amount.coerceAtLeast(0.0)
+        prefs.monthlyBudget = value
+        monthlyBudget.value = value
     }
 
     fun addOrUpdateSubscription(
@@ -134,6 +172,8 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
         amount: Double,
         frequency: String,
         nextDate: String,
+        nextDateEpochMs: Long? = null,
+        trialEndEpochMs: Long? = null,
         rail: String,
         source: String = "MANUAL",
         last4: String?,
@@ -141,19 +181,25 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
         onComplete: () -> Unit
     ) {
         viewModelScope.launch {
+            // Editing keeps what the form does not show (status, mandate limit, last-seen time)
+            val old = if (id != 0L) repository.getSubscriptionById(id) else null
             val entity = SubscriptionEntity(
                 id = id,
                 merchant = merchant,
                 amount = amount,
                 frequency = frequency,
                 nextDate = nextDate,
-                nextDateEpochMs = System.currentTimeMillis() + (14L * 24 * 3600 * 1000),
+                nextDateEpochMs = nextDateEpochMs ?: old?.nextDateEpochMs
+                    ?: (System.currentTimeMillis() + (14L * 24 * 3600 * 1000)),
                 rail = rail,
                 source = source,
                 last4 = last4?.filter { it.isDigit() }?.takeLast(4),
-                status = "ACTIVE",
+                status = old?.status ?: "ACTIVE",
                 userConfirmed = true,
-                notes = notes
+                notes = notes,
+                maxAmount = old?.maxAmount,
+                trialEndEpochMs = trialEndEpochMs,
+                lastSeenAtMs = old?.lastSeenAtMs ?: 0L
             )
             if (id == 0L) {
                 repository.insertSubscription(entity)

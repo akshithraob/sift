@@ -17,6 +17,7 @@ import com.example.backup.BackupCrypto
 import com.example.backup.CsvExport
 import com.example.backup.InvalidBackupException
 import com.example.backup.WrongPassphraseException
+import com.example.backup.readAtMost
 import com.example.insights.ImportDiff
 import com.example.insights.ImportDiffResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -208,7 +209,7 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             _backupResult.value = try {
                 val blob = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    contentResolver.openInputStream(uri)?.use { it.readNBytes(MAX_BACKUP_BYTES + 1) }
+                    contentResolver.openInputStream(uri)?.use { readAtMost(it, MAX_BACKUP_BYTES) }
                         ?: throw java.io.IOException("no stream")
                 }
                 if (blob.size > MAX_BACKUP_BYTES) throw InvalidBackupException("This file is too large to be a SubTrack backup")

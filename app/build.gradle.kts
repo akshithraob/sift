@@ -121,3 +121,25 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   // "ksp"(libs.moshi.kotlin.codegen)
 }
+
+// The "your data never leaves your phone" promise depends on the shipped APK having no network
+// permission. Libraries can add one through manifest merging, so check the merged result.
+val verifyNoInternetPermission = tasks.register("verifyNoInternetPermission") {
+  val manifests = listOf("debug", "release").map { variant ->
+    layout.buildDirectory.file("intermediates/merged_manifest/$variant/process${variant.replaceFirstChar { it.uppercase() }}MainManifest/AndroidManifest.xml")
+  }
+  dependsOn("processDebugMainManifest", "processReleaseMainManifest")
+  doLast {
+    manifests.forEach { provider ->
+      val file = provider.get().asFile
+      check(file.exists()) { "Merged manifest not found: $file" }
+      check(!file.readText().contains("android.permission.INTERNET")) {
+        "android.permission.INTERNET is present in the merged manifest ($file). " +
+          "Find the library that adds it in the manifest-merger report and remove it with tools:node=\"remove\"."
+      }
+    }
+  }
+}
+
+tasks.matching { it.name in setOf("assembleDebug", "assembleRelease", "bundleRelease", "check") }
+  .configureEach { dependsOn(verifyNoInternetPermission) }

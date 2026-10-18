@@ -2,7 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Zero Network Policy: INTERNET permission is strictly absent -->
+    <!-- Zero Network Policy: INTERNET permission is strictly absent.
+         Google's data-transport library (pulled in by ML Kit) declares INTERNET so it can upload
+         telemetry; it is removed from the merged manifest here, and the build fails if it reappears
+         (see verifyNoInternetPermission in app/build.gradle.kts). -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

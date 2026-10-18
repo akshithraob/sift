@@ -23,6 +23,20 @@ import javax.crypto.spec.SecretKeySpec
 class WrongPassphraseException : Exception("Wrong passphrase, or the file was modified")
 class InvalidBackupException(message: String) : Exception(message)
 
+/** Reads at most [limit] + 1 bytes, so callers can tell "too large" without loading a huge file. */
+fun readAtMost(input: java.io.InputStream, limit: Int): ByteArray {
+    val out = java.io.ByteArrayOutputStream()
+    val buffer = ByteArray(8 * 1024)
+    var total = 0
+    while (total <= limit) {
+        val n = input.read(buffer, 0, minOf(buffer.size, limit + 1 - total))
+        if (n < 0) break
+        out.write(buffer, 0, n)
+        total += n
+    }
+    return out.toByteArray()
+}
+
 object BackupCrypto {
     private val MAGIC = "STBK1".toByteArray(Charsets.US_ASCII)
     private const val SALT_BYTES = 16

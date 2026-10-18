@@ -103,7 +103,13 @@ class RenewalReminderWorker(
             .setAutoCancel(true)
             .build()
 
-        NotificationManagerCompat.from(context).notify(id, notification)
+        // Permission is re-checked here (it can be revoked while the worker runs)
+        if (!canNotify(context)) return
+        try {
+            @Suppress("MissingPermission")
+            NotificationManagerCompat.from(context).notify(id, notification)
+        } catch (_: SecurityException) {
+        }
     }
 
     private fun startOfDay(daysFromToday: Int): Long {

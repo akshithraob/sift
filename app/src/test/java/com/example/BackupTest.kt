@@ -89,6 +89,15 @@ class BackupTest {
             }
     }
 
+    @Test
+    fun readAtMost_stopsOneByteBeyondTheLimit() {
+        val data = ByteArray(100) { it.toByte() }
+
+        assertEquals(100, com.example.backup.readAtMost(data.inputStream(), 100).size) // exactly at the limit
+        assertEquals(51, com.example.backup.readAtMost(data.inputStream(), 50).size)   // limit + 1 signals "too big"
+        assertEquals(0, com.example.backup.readAtMost(ByteArray(0).inputStream(), 50).size)
+    }
+
     // --- Codec
 
     @Test

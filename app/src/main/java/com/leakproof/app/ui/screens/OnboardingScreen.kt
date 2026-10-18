@@ -69,9 +69,9 @@ fun OnboardingScreen(
         ),
         OnboardingPageData(
             icon = Icons.Default.Shield,
-            title = "Hardware-Encrypted Vault",
-            tagline = "Military Grade Defense",
-            description = "Your mandate records are encrypted using SQLCipher AES-256. Cryptographic keys are locked inside the Android Hardware Keystore."
+            title = "Encrypted Vault",
+            tagline = "Encrypted on your phone",
+            description = "Your mandate records are encrypted with SQLCipher AES-256, and the key is protected by the Android Keystore."
         ),
         OnboardingPageData(
             icon = Icons.Default.VpnKey,

@@ -423,7 +423,7 @@ fun SettingsScreen(
                     PrivacyBulletItem(
                         icon = Icons.Default.Shield,
                         title = "SQLCipher Database Encryption",
-                        description = "All tables are encrypted at rest with 256-bit AES cipher. Keys are protected by Android Keystore hardware security."
+                        description = "All tables are encrypted at rest with 256-bit AES cipher. The key is protected by the Android Keystore."
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     PrivacyBulletItem(

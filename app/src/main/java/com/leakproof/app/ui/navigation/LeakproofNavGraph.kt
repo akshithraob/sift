@@ -43,6 +43,7 @@ fun LeakproofNavGraph(
     viewModel: LeakproofViewModel,
     navController: NavHostController = rememberNavController()
 ) {
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val isConsentGiven by viewModel.isConsentGiven.collectAsState()
     val isOnboardingCompleted by viewModel.isOnboardingCompleted.collectAsState()
     val isAppLocked by viewModel.isAppLocked.collectAsState()
@@ -170,11 +171,7 @@ fun LeakproofNavGraph(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onOpenPrivacyPolicy = { navController.navigate(Destinations.PRIVACY_POLICY) },
-                onDataWiped = {
-                    navController.navigate(Destinations.CONSENT) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
+                onDataWiped = { com.leakproof.app.util.restartApp(appContext) }
             )
         }
     }

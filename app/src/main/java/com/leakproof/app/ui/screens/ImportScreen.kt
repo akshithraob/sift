@@ -252,7 +252,7 @@ fun ImportScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "100% On-Device Processing: Files are copied to temporary memory only during parsing and deleted immediately after.",
+                        text = "Processed on your phone: files are copied to a temporary location only while they are read, then deleted immediately.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 17.sp

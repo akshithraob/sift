@@ -291,7 +291,11 @@ fun ImportScreen(
                 onPrimaryAction = {
                     viewModel.beginExternalPicker()
                     documentPickerLauncher.launch(
-                        arrayOf("application/pdf", "text/csv", "text/comma-separated-values")
+                        // Phones label .csv differently (Excel, plain text, "octet-stream"), and a mismatch greys the file out
+                        arrayOf(
+                            "application/pdf", "text/csv", "text/comma-separated-values", "text/x-csv",
+                            "application/csv", "application/vnd.ms-excel", "text/plain", "application/octet-stream"
+                        )
                     )
                 },
                 primaryButtonText = "Select PDF / CSV",

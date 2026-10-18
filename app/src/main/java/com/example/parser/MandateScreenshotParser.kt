@@ -282,7 +282,11 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
                 !lower.startsWith("account") &&
                 !lower.startsWith("ending in") &&
                 !lower.startsWith("next") &&
-                !lower.startsWith("debited")
+                !lower.startsWith("debited") &&
+                !lower.startsWith("up to") &&
+                !lower.startsWith("max") &&
+                !lower.startsWith("limit") &&
+                clean.count { it.isLetter() } > clean.count { it.isDigit() }
             ) {
                 return clean
             }

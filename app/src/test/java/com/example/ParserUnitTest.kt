@@ -328,4 +328,22 @@ class ParserUnitTest {
         assertEquals(1, result.size)
         assertEquals(Frequency.AS_PRESENTED, result[0].frequency)
     }
+
+    @Test
+    fun testScreenshotParser_amountLimitLineIsNotMerchant() {
+        val parser = DefaultMandateScreenshotParser()
+        val result = parser.parseOcrText(
+            """
+            Autopay
+            Up to 1,999
+            Hungama Digital
+            Every month
+            """.trimIndent(),
+            "Google Pay"
+        )
+
+        assertEquals(1, result.size)
+        assertEquals("Hungama Digital", result[0].merchant)
+        assertEquals(1999.0, result[0].amount, 0.01)
+    }
 }

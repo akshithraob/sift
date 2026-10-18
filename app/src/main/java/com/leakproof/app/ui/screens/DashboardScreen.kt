@@ -1,6 +1,5 @@
 package com.leakproof.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,16 +21,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -39,39 +40,56 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.leakproof.app.data.local.SubscriptionEntity
 import com.leakproof.app.insights.Budget
-import com.leakproof.app.insights.MandateRiskAnalyzer
-import com.leakproof.app.insights.OverlapDetector
+import com.leakproof.app.insights.BudgetLevel
+import com.leakproof.app.insights.BudgetStatus
+import com.leakproof.app.insights.Leak
+import com.leakproof.app.insights.LeakFinder
+import com.leakproof.app.insights.LeakKind
+import com.leakproof.app.insights.LeakSeverity
 import com.leakproof.app.insights.Trials
-import com.leakproof.app.ui.components.PaymentRailBadge
-import com.leakproof.app.ui.components.insightItems
-import com.leakproof.app.ui.components.StatusBadge
+import com.leakproof.app.insights.monthlyCost
+import com.leakproof.app.ui.components.AppCard
+import com.leakproof.app.ui.components.BrandMark
+import com.leakproof.app.ui.components.CountPill
+import com.leakproof.app.ui.components.InitialAvatar
+import com.leakproof.app.ui.components.SectionTitle
+import com.leakproof.app.ui.components.Spacing
 import com.leakproof.app.ui.theme.BrandPrimary
+import com.leakproof.app.ui.theme.StatusActive
+import com.leakproof.app.ui.theme.StatusCancelled
 import com.leakproof.app.ui.theme.StatusPaused
 import com.leakproof.app.ui.viewmodel.LeakproofViewModel
 import com.leakproof.app.util.CurrencyFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private val HeroTop = Color(0xFF00BFA5)
+private val HeroBottom = Color(0xFF00695C)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,490 +103,508 @@ fun DashboardScreen(
     val subscriptions by viewModel.allSubscriptions.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedFilter by viewModel.selectedRailFilter.collectAsState()
-
-    // Calculate spend statistics
-    val activeSubscriptions = subscriptions.filter { it.status == "ACTIVE" }
-
-    var totalMonthly = 0.0
-    for (sub in activeSubscriptions) {
-        when (sub.frequency.uppercase()) {
-            "MONTHLY" -> totalMonthly += sub.amount
-            "YEARLY" -> totalMonthly += (sub.amount / 12.0)
-            "WEEKLY" -> totalMonthly += (sub.amount * 4.33)
-            "QUARTERLY" -> totalMonthly += (sub.amount / 3.0)
-            else -> totalMonthly += sub.amount
-        }
-    }
-    val totalYearly = totalMonthly * 12.0
-
-    // Insights: budget, trials, overlapping services, risky mandate limits
     val monthlyBudget by viewModel.monthlyBudget.collectAsState()
-    val budgetStatus = Budget.evaluate(totalMonthly, monthlyBudget)
-    val activeTrials = Trials.activeTrials(subscriptions)
-    val overlaps = OverlapDetector.detect(subscriptions)
-    val risks = MandateRiskAnalyzer.analyze(subscriptions)
 
-    // Upcoming in next 7 days
-    val now = System.currentTimeMillis()
-    val sevenDaysMs = 7L * 24 * 3600 * 1000
-    val upcomingSoon = activeSubscriptions.filter {
-        it.nextDateEpochMs in now..(now + sevenDaysMs)
-    }
+    val active = subscriptions.filter { it.status == "ACTIVE" }
+    val totalMonthly = active.sumOf { monthlyCost(it.amount, it.frequency) }
+    val budget = Budget.evaluate(totalMonthly, monthlyBudget)
+    val leaks = remember(subscriptions, budget) { LeakFinder.find(subscriptions, budget) }
 
-    // Filtered subscriptions list
-    val filteredList = subscriptions.filter { sub ->
-        val matchesSearch = sub.merchant.contains(searchQuery, ignoreCase = true) ||
+    val comingUp = active
+        .filter { Trials.daysUntil(it.nextDateEpochMs) in 0..7 }
+        .sortedBy { it.nextDateEpochMs }
+
+    val shown = subscriptions
+        .filter { sub ->
+            val matchesSearch = sub.merchant.contains(searchQuery, ignoreCase = true) ||
                 (sub.last4?.contains(searchQuery) == true)
-        val matchesFilter = when (selectedFilter) {
-            "ALL" -> true
-            else -> sub.rail.equals(selectedFilter, ignoreCase = true)
+            val matchesFilter = selectedFilter == "ALL" || sub.rail.equals(selectedFilter, ignoreCase = true)
+            matchesSearch && matchesFilter
         }
-        matchesSearch && matchesFilter
-    }
-
-    // Grouping by rail if "ALL" is selected
-    val groupedByRail = filteredList.groupBy { it.rail }
+        .sortedWith(compareBy({ it.status != "ACTIVE" }, { it.nextDateEpochMs }))
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Leakproof",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = BrandPrimary.copy(alpha = 0.15f)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Shield,
-                                    contentDescription = null,
-                                    tint = BrandPrimary,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = "OFFLINE",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = BrandPrimary
-                                )
-                            }
-                        }
-                    }
-                },
+                title = { BrandMark() },
                 actions = {
-                    IconButton(
-                        onClick = onNavigateToImport,
-                        modifier = Modifier.testTag("import_action_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FileDownload,
-                            contentDescription = "Import",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
+                    IconButton(onClick = onNavigateToImport, modifier = Modifier.testTag("import_action_button")) {
+                        Icon(Icons.Default.FileDownload, contentDescription = "Import", tint = MaterialTheme.colorScheme.onBackground)
                     }
-                    IconButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier.testTag("settings_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
+                    IconButton(onClick = onNavigateToSettings, modifier = Modifier.testTag("settings_button")) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onBackground)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToImport,
-                containerColor = BrandPrimary,
-                contentColor = Color(0xFF00382E),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.testTag("fab_import")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            if (subscriptions.isNotEmpty()) {
+                FloatingActionButton(
+                    onClick = onNavigateToImport,
+                    containerColor = BrandPrimary,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.testTag("fab_import")
                 ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Add Mandate", fontWeight = FontWeight.Bold)
+                    Row(modifier = Modifier.padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Add", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
-    ) { paddingValues ->
+    ) { padding ->
+        if (subscriptions.isEmpty()) {
+            EmptyDashboard(
+                onImport = onNavigateToImport,
+                onAddManually = onNavigateToManualAdd,
+                modifier = Modifier.padding(padding)
+            )
+            return@Scaffold
+        }
+
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = 96.dp)
         ) {
-            // Spend Summary Cards
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("monthly_spend_card"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "MONTHLY SPEND",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                letterSpacing = 0.8.sp
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = CurrencyFormatter.format(totalMonthly),
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = BrandPrimary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "${activeSubscriptions.size} active mandates",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+            item { Hero(totalMonthly = totalMonthly, activeCount = active.size, budget = budget) }
 
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("yearly_spend_card"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
+            item {
+                SectionTitle("Leaks found") {
+                    if (leaks.isNotEmpty()) {
+                        CountPill(
+                            leaks.size.toString(),
+                            if (leaks.any { it.severity == LeakSeverity.HIGH }) StatusCancelled else StatusPaused
                         )
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "PROJECTED YEARLY",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                letterSpacing = 0.8.sp
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = CurrencyFormatter.format(totalYearly),
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Est. annual recurring",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 }
+                LeaksCard(leaks)
             }
 
-            // Upcoming in 7 Days Alert Banner
-            if (upcomingSoon.isNotEmpty()) {
+            if (comingUp.isNotEmpty()) {
                 item {
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Card(
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = StatusPaused.copy(alpha = 0.12f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CalendarMonth,
-                                contentDescription = null,
-                                tint = StatusPaused,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "${upcomingSoon.size} Renewals Due in Next 7 Days",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = upcomingSoon.joinToString(", ") { "${it.merchant} (${CurrencyFormatter.format(it.amount)})" },
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                    SectionTitle("Next 7 days") {
+                        Text(
+                            text = "${CurrencyFormatter.format(comingUp.sumOf { it.amount })} due",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
+                    ComingUpCard(comingUp, onNavigateToDetail)
                 }
             }
 
-            insightItems(budgetStatus, activeTrials, overlaps, risks)
-
-            // Search Bar
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                SectionTitle("All subscriptions") {
+                    Text(
+                        text = "${subscriptions.size}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { viewModel.searchQuery.value = it },
-                    placeholder = { Text("Search merchant or last 4 digits...") },
-                    leadingIcon = {
-                        Icon(imageVector = Icons.Default.Search, contentDescription = null)
-                    },
+                    placeholder = { Text("Search by name or last 4 digits") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { viewModel.searchQuery.value = "" }) {
-                                Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear")
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
                             }
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                     ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("search_field")
+                    modifier = Modifier.fillMaxWidth().testTag("search_field")
                 )
-            }
-
-            // Rail Filter Chips
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-                val filters = listOf(
-                    "ALL" to "All Mandates",
-                    "UPI" to "UPI Autopay",
-                    "NACH" to "e-NACH",
-                    "SI" to "Standing Inst.",
-                    "CARD" to "Card"
-                )
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filters) { (railKey, label) ->
-                        val isSelected = selectedFilter == railKey
+                Spacer(modifier = Modifier.height(10.dp))
+                val filters = listOf("ALL" to "All", "UPI" to "UPI Autopay", "NACH" to "e-NACH", "SI" to "Standing", "CARD" to "Card")
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(filters) { (key, label) ->
                         FilterChip(
-                            selected = isSelected,
-                            onClick = { viewModel.selectedRailFilter.value = railKey },
+                            selected = selectedFilter == key,
+                            onClick = { viewModel.selectedRailFilter.value = key },
                             label = { Text(label, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = BrandPrimary.copy(alpha = 0.2f),
-                                selectedLabelColor = BrandPrimary
+                                selectedContainerColor = BrandPrimary.copy(alpha = 0.18f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary
                             ),
-                            modifier = Modifier.testTag("filter_$railKey")
+                            modifier = Modifier.testTag("filter_$key")
                         )
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Subscriptions Content
-            if (filteredList.isEmpty()) {
+            if (shown.isEmpty()) {
                 item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(54.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "No Mandates Found",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Import a screenshot or statement to detect recurring debits",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "Nothing matches your search.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 24.dp)
+                    )
                 }
             } else {
-                // If filter is "ALL", show grouped section headers
-                if (selectedFilter == "ALL") {
-                    groupedByRail.forEach { (rail, railSubs) ->
-                        item {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
-                            ) {
-                                PaymentRailBadge(rail = rail)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "(${railSubs.size})",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        items(railSubs, key = { it.id }) { subscription ->
-                            SubscriptionItemCard(
-                                subscription = subscription,
-                                onClick = { onNavigateToDetail(subscription.id) }
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-                } else {
-                    items(filteredList, key = { it.id }) { subscription ->
-                        SubscriptionItemCard(
-                            subscription = subscription,
-                            onClick = { onNavigateToDetail(subscription.id) }
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
+                items(shown, key = { it.id }) { sub ->
+                    SubscriptionRow(sub) { onNavigateToDetail(sub.id) }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-            }
-
-            // Bottom Spacer for FAB
-            item {
-                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }
 }
 
+// ---------------------------------------------------------------- Hero
+
 @Composable
-fun SubscriptionItemCard(
-    subscription: SubscriptionEntity,
-    onClick: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus) {
+    Box(
         modifier = Modifier
+            .padding(top = 6.dp)
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .testTag("subscription_item_${subscription.id}")
+            .clip(RoundedCornerShape(26.dp))
+            .background(Brush.linearGradient(listOf(HeroTop, HeroBottom)))
+            .testTag("monthly_spend_card")
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = subscription.merchant,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        PaymentRailBadge(rail = subscription.rail)
-                        if (!subscription.last4.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "A/c **${subscription.last4}",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
+        Column(modifier = Modifier.padding(22.dp)) {
+            Text(
+                text = "YOU PAY EVERY MONTH",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                color = Color.White.copy(alpha = 0.78f)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = CurrencyFormatter.format(totalMonthly),
+                fontSize = 42.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+            Text(
+                text = "${CurrencyFormatter.format(totalMonthly * 12)} a year · $activeCount active",
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.testTag("yearly_spend_card")
+            )
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = CurrencyFormatter.format(subscription.amount),
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "/ ${subscription.frequency.lowercase()}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            if (budget.level != BudgetLevel.NONE) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.25f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(budget.ratio.coerceIn(0f, 1f))
+                            .height(8.dp)
+                            .clip(CircleShape)
+                            .background(if (budget.level == BudgetLevel.OVER) Color(0xFFFFD54F) else Color.White)
                     )
                 }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = when (budget.level) {
+                        BudgetLevel.OVER -> "${CurrencyFormatter.format(-budget.remaining)} over your ${CurrencyFormatter.format(budget.budget)} budget"
+                        else -> "${CurrencyFormatter.format(budget.remaining)} left of your ${CurrencyFormatter.format(budget.budget)} budget"
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    modifier = Modifier.testTag("insight_budget")
+                )
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(10.dp))
+// ---------------------------------------------------------------- Leaks
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarMonth,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
+private fun Leak.icon(): ImageVector = when (kind) {
+    LeakKind.OVER_BUDGET, LeakKind.NEAR_BUDGET -> Icons.Default.TrendingUp
+    LeakKind.TRIAL -> Icons.Default.HourglassBottom
+    LeakKind.DUPLICATE, LeakKind.OVERLAP -> Icons.Default.ContentCopy
+    LeakKind.MANDATE_LIMIT -> Icons.Default.Warning
+}
+
+@Composable
+private fun LeaksCard(leaks: List<Leak>) {
+    AppCard(modifier = Modifier.testTag("leaks_card")) {
+        if (leaks.isEmpty()) {
+            Row(modifier = Modifier.padding(Spacing.card), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = StatusActive, modifier = Modifier.size(26.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("All clear", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                     Text(
-                        text = "Next: ${subscription.nextDate}",
+                        "No overlapping services, risky limits or trials ending soon.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
-                StatusBadge(status = subscription.status)
             }
-
-            val trialEnd = subscription.trialEndEpochMs
-            if (trialEnd != null && subscription.status == "ACTIVE" && Trials.daysUntil(trialEnd) >= 0) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = Trials.label(Trials.daysUntil(trialEnd)),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = StatusPaused,
-                    modifier = Modifier.testTag("trial_label_${subscription.id}")
+            return@AppCard
+        }
+        leaks.forEachIndexed { index, leak ->
+            val tint = if (leak.severity == LeakSeverity.HIGH) StatusCancelled else StatusPaused
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(Spacing.card).testTag("leak_${leak.kind.name.lowercase()}"),
+                verticalAlignment = Alignment.Top
+            ) {
+                Box(
+                    modifier = Modifier.size(36.dp).clip(CircleShape).background(tint.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(leak.icon(), contentDescription = null, tint = tint, modifier = Modifier.size(19.dp))
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(leak.title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        leak.body,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            if (index < leaks.lastIndex) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = Spacing.card)
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.14f))
                 )
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------- Coming up
+
+@Composable
+private fun ComingUpCard(items: List<SubscriptionEntity>, onClick: (Long) -> Unit) {
+    val dayFormat = remember { SimpleDateFormat("d", Locale.ENGLISH) }
+    val monthFormat = remember { SimpleDateFormat("MMM", Locale.ENGLISH) }
+    val visible = items.take(5)
+
+    AppCard(modifier = Modifier.testTag("coming_up_card")) {
+        visible.forEachIndexed { index, sub ->
+            val days = Trials.daysUntil(sub.nextDateEpochMs)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onClick(sub.id) }
+                    .padding(horizontal = Spacing.card, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier
+                        .size(width = 46.dp, height = 50.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(BrandPrimary.copy(alpha = 0.12f)),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        dayFormat.format(Date(sub.nextDateEpochMs)),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 17.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        monthFormat.format(Date(sub.nextDateEpochMs)).uppercase(),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        sub.merchant,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        when (days) {
+                            0 -> "Today"
+                            1 -> "Tomorrow"
+                            else -> "In $days days"
+                        },
+                        fontSize = 12.sp,
+                        color = if (days <= 1) StatusPaused else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    CurrencyFormatter.format(sub.amount),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            if (index < visible.lastIndex) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = Spacing.card)
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.14f))
+                )
+            }
+        }
+        if (items.size > visible.size) {
+            Text(
+                "+${items.size - visible.size} more this week",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.card, vertical = 10.dp)
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------- List row
+
+@Composable
+fun SubscriptionItemCard(subscription: SubscriptionEntity, onClick: () -> Unit) = SubscriptionRow(subscription, onClick)
+
+@Composable
+private fun SubscriptionRow(subscription: SubscriptionEntity, onClick: () -> Unit) {
+    val railLabel = when (subscription.rail.uppercase()) {
+        "UPI" -> "UPI Autopay"
+        "NACH" -> "e-NACH"
+        "SI" -> "Standing instruction"
+        "CARD" -> "Card"
+        else -> "Other"
+    }
+    val trialEnd = subscription.trialEndEpochMs
+    val inactive = subscription.status != "ACTIVE"
+
+    AppCard(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .testTag("subscription_item_${subscription.id}")
+    ) {
+        Row(modifier = Modifier.padding(Spacing.card), verticalAlignment = Alignment.CenterVertically) {
+            InitialAvatar(subscription.merchant)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    subscription.merchant,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (inactive) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    "$railLabel · ${subscription.frequency.lowercase().replace('_', ' ')}" +
+                        (subscription.last4?.takeIf { it.isNotBlank() }?.let { " · ••$it" } ?: ""),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                when {
+                    inactive -> Text(
+                        subscription.status.lowercase().replaceFirstChar { it.uppercase() },
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (subscription.status == "CANCELLED") StatusCancelled else StatusPaused
+                    )
+                    trialEnd != null && Trials.daysUntil(trialEnd) >= 0 -> Text(
+                        Trials.label(Trials.daysUntil(trialEnd)),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = StatusPaused,
+                        modifier = Modifier.testTag("trial_label_${subscription.id}")
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    CurrencyFormatter.format(subscription.amount),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 17.sp,
+                    color = if (inactive) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    subscription.nextDate,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Empty state
+
+@Composable
+private fun EmptyDashboard(onImport: () -> Unit, onAddManually: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(Brush.linearGradient(listOf(HeroTop, HeroBottom))),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.WaterDrop, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
+        }
+        Spacer(modifier = Modifier.height(22.dp))
+        Text(
+            "Find your leaks",
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 26.sp,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Add a screenshot of your UPI app's Autopay list or a bank statement. Leakproof finds every recurring payment, " +
+                "flags the ones you're paying twice, and keeps it all on your phone.",
+            fontSize = 14.sp,
+            lineHeight = 21.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(26.dp))
+        Button(
+            onClick = onImport,
+            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("empty_import_button")
+        ) { Text("Import screenshots or a statement", fontWeight = FontWeight.Bold) }
+        Spacer(modifier = Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onAddManually,
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("empty_manual_button")
+        ) { Text("Add one manually") }
     }
 }

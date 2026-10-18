@@ -302,7 +302,8 @@ fun ImportScreen(
 
             // Action 3: Manual Entry Card
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -374,7 +375,8 @@ private fun ImportActionCard(
     testTagPrefix: String
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
+        border = com.leakproof.app.ui.components.appCardBorder(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),

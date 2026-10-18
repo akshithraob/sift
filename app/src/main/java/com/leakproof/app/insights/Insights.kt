@@ -262,3 +262,84 @@ object Trials {
         else -> "Trial ends in $daysLeft days"
     }
 }
+
+// ---------------------------------------------------------------- Leaks (what needs attention)
+
+enum class LeakSeverity { HIGH, MEDIUM }
+
+enum class LeakKind { OVER_BUDGET, NEAR_BUDGET, TRIAL, DUPLICATE, OVERLAP, MANDATE_LIMIT }
+
+data class Leak(
+    val kind: LeakKind,
+    val severity: LeakSeverity,
+    val title: String,
+    val body: String,
+    val subscriptionIds: List<Long> = emptyList()
+)
+
+/** Gathers everything the home screen should flag, most urgent first. */
+object LeakFinder {
+
+    private const val TRIAL_WARNING_DAYS = 14
+
+    fun find(
+        subscriptions: List<SubscriptionEntity>,
+        budget: BudgetStatus,
+        nowMs: Long = System.currentTimeMillis()
+    ): List<Leak> {
+        val leaks = mutableListOf<Leak>()
+
+        when (budget.level) {
+            BudgetLevel.OVER -> leaks.add(
+                Leak(
+                    LeakKind.OVER_BUDGET, LeakSeverity.HIGH,
+                    "${CurrencyFormatter.format(-budget.remaining)} over budget",
+                    "Subscriptions cost ${CurrencyFormatter.format(budget.spent)} a month against your budget of ${CurrencyFormatter.format(budget.budget)}."
+                )
+            )
+            BudgetLevel.NEAR -> leaks.add(
+                Leak(
+                    LeakKind.NEAR_BUDGET, LeakSeverity.MEDIUM,
+                    "Close to your budget",
+                    "${CurrencyFormatter.format(budget.remaining)} left of ${CurrencyFormatter.format(budget.budget)} this month."
+                )
+            )
+            else -> Unit
+        }
+
+        for (sub in Trials.activeTrials(subscriptions, nowMs)) {
+            val days = Trials.daysUntil(sub.trialEndEpochMs ?: continue, nowMs)
+            if (days > TRIAL_WARNING_DAYS) continue
+            leaks.add(
+                Leak(
+                    LeakKind.TRIAL,
+                    if (days <= 2) LeakSeverity.HIGH else LeakSeverity.MEDIUM,
+                    "${sub.merchant}: ${Trials.label(days).replaceFirstChar { it.lowercase() }}",
+                    "Cancel before it ends to avoid being charged ${CurrencyFormatter.format(sub.amount)}.",
+                    listOf(sub.id)
+                )
+            )
+        }
+
+        for (insight in OverlapDetector.detect(subscriptions)) {
+            leaks.add(
+                Leak(
+                    if (insight.kind == OverlapKind.DUPLICATE) LeakKind.DUPLICATE else LeakKind.OVERLAP,
+                    if (insight.kind == OverlapKind.DUPLICATE) LeakSeverity.HIGH else LeakSeverity.MEDIUM,
+                    insight.title,
+                    "${insight.merchants.joinToString(" + ")} together cost ${CurrencyFormatter.format(insight.monthlyTotal)}/month. " +
+                        if (insight.kind == OverlapKind.DUPLICATE) "Keep one and cancel the other." else "Keep the one you use most?",
+                    insight.subscriptionIds
+                )
+            )
+        }
+
+        for (risk in MandateRiskAnalyzer.analyze(subscriptions)) {
+            leaks.add(
+                Leak(LeakKind.MANDATE_LIMIT, LeakSeverity.MEDIUM, "Mandate limit: ${risk.merchant}", risk.message, listOf(risk.subscriptionId))
+            )
+        }
+
+        return leaks.sortedWith(compareBy({ it.severity }, { it.kind }))
+    }
+}

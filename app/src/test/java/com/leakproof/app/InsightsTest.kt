@@ -238,4 +238,50 @@ class InsightsTest {
         assertEquals("Trial ends tomorrow", Trials.label(1))
         assertEquals("Trial ends in 5 days", Trials.label(5))
     }
+
+    // --- LeakFinder
+
+    @Test
+    fun leaks_collectsEverythingThatNeedsAttentionMostUrgentFirst() {
+        val now = System.currentTimeMillis()
+        val subs = listOf(
+            sub(1, "Spotify", 119.0),
+            sub(2, "Apple Music", 99.0),
+            sub(3, "Hungama", 99.0, maxAmount = 10000.0),
+            sub(4, "Claude", 1999.0, trialEnd = now + day)
+        )
+        val budget = Budget.evaluate(2316.0, 2000.0)
+
+        val leaks = com.leakproof.app.insights.LeakFinder.find(subs, budget, now)
+
+        assertEquals(
+            listOf(
+                com.leakproof.app.insights.LeakKind.OVER_BUDGET,
+                com.leakproof.app.insights.LeakKind.TRIAL,
+                com.leakproof.app.insights.LeakKind.OVERLAP,
+                com.leakproof.app.insights.LeakKind.MANDATE_LIMIT
+            ),
+            leaks.map { it.kind }
+        )
+        // High severity (over budget, trial ending tomorrow) comes before medium
+        assertTrue(leaks.take(2).all { it.severity == com.leakproof.app.insights.LeakSeverity.HIGH })
+        assertTrue(leaks.first { it.kind == com.leakproof.app.insights.LeakKind.TRIAL }.title.contains("Claude"))
+    }
+
+    @Test
+    fun leaks_nothingToReportWhenAllIsWell() {
+        val subs = listOf(sub(1, "Netflix", 649.0), sub(2, "BESCOM", 1850.0, rail = "SI"))
+
+        assertTrue(com.leakproof.app.insights.LeakFinder.find(subs, Budget.evaluate(2499.0, 10000.0)).isEmpty())
+    }
+
+    @Test
+    fun leaks_nearBudgetIsAMediumWarningAndFarTrialsAreIgnored() {
+        val now = System.currentTimeMillis()
+        val subs = listOf(sub(1, "Claude", 1999.0, trialEnd = now + 30 * day))
+
+        val leaks = com.leakproof.app.insights.LeakFinder.find(subs, Budget.evaluate(1999.0, 2200.0), now)
+
+        assertEquals(listOf(com.leakproof.app.insights.LeakKind.NEAR_BUDGET), leaks.map { it.kind })
+    }
 }

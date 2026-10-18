@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/leakproof_launcher_icon_1792255577106"
-        android:gravity="center" />
-</layer-list>
+<!-- A water drop sealed with a keyhole: "leakproof". Kept inside the 66dp adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M54,25 C54,25 36,45 36,58 C36,68 44,76 54,76 C64,76 72,68 72,58 C72,45 54,25 54,25 Z M49.5,56 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 Z M52,59 L56,59 L57.6,67 L50.4,67 Z" />
+</vector>

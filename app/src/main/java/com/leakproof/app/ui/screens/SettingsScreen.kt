@@ -169,7 +169,8 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "SECURITY & ACCESS")
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -254,7 +255,8 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "NOTIFICATIONS")
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -318,7 +320,8 @@ fun SettingsScreen(
                 mutableStateOf(if (savedBudget > 0) savedBudget.toLong().toString() else "")
             }
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -364,7 +367,8 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "PRIVACY & CONSENT")
             val consentAt by viewModel.consentAtMs.collectAsState()
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -404,7 +408,8 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "PRIVACY & ZERO-CLOUD ARCHITECTURE")
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -433,7 +438,8 @@ fun SettingsScreen(
 
             // NPCI UPI Help Resource
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 ),
@@ -483,7 +489,8 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "DANGER ZONE")
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(
                     containerColor = StatusCancelled.copy(alpha = 0.08f)
                 ),
@@ -727,7 +734,8 @@ private fun BackupSection(viewModel: LeakproofViewModel) {
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
+        border = com.leakproof.app.ui.components.appCardBorder(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth()
     ) {

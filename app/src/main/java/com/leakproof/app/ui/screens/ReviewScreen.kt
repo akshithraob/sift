@@ -316,7 +316,8 @@ private fun MissingMandatesCard(
     onToggle: (Long) -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
+        border = com.leakproof.app.ui.components.appCardBorder(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth().testTag("missing_mandates_card")
     ) {
@@ -361,7 +362,8 @@ fun CandidateReviewCard(
     onEdit: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
+        border = com.leakproof.app.ui.components.appCardBorder(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),

@@ -187,6 +187,7 @@ fun SubscriptionDetailScreen(
             // Main Info Header Card
             Card(
                 shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -297,6 +298,7 @@ fun SubscriptionDetailScreen(
             // "HOW TO CANCEL" SECTION
             Card(
                 shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),

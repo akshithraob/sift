@@ -206,7 +206,8 @@ fun OnboardingScreen(
                 // If on last page, show App Lock setup
                 AnimatedVisibility(visible = pagerState.currentPage == 2) {
                     Card(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        border = com.leakproof.app.ui.components.appCardBorder(),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),

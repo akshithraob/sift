@@ -370,11 +370,12 @@ class ParserUnitTest {
             line("Transfer now", 182, 1055, 347, 1088)
         )
         val result = DefaultMandateScreenshotParser()
-            .parseOcrDocument(OcrDocument(listOf(OcrTextBlock("", null, lines))), "Google Pay")
+            .parseOcrDocument(OcrDocument(listOf(OcrTextBlock("", null, lines))))
 
         assertEquals(1, result.size)
         val m = result[0]
         assertEquals("Google Play", m.merchant)
+        assertEquals("Google Pay", m.sourceApp)
         assertEquals(1999.0, m.amount, 0.01)
         assertEquals(1999.0, m.maxAmount ?: 0.0, 0.01)
         assertEquals(Frequency.AS_PRESENTED, m.frequency)

@@ -31,13 +31,13 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
     )
 
     override fun parseOcrDocument(document: OcrDocument, sourceAppHint: String?): List<ParsedMandateCandidate> {
-        val allLines = document.allLines.filter { it.text.isNotBlank() }.filterNot { isNoiseLine(it.text) }
+        val nonBlank = document.allLines.filter { it.text.isNotBlank() }
+        // Detect the source app from the whole screen, including header and promo text
+        val detectedApp = detectSourceApp(nonBlank.joinToString("\n") { it.text }, sourceAppHint)
+        val allLines = nonBlank.filterNot { isNoiseLine(it.text) }
         if (allLines.isEmpty()) {
             return emptyList()
         }
-
-        val fullText = allLines.joinToString("\n") { it.text }
-        val detectedApp = detectSourceApp(fullText, sourceAppHint)
 
         // Group lines into cards using spatial vertical distance or blocks
         val cardGroups = groupLinesIntoCards(allLines)

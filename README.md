@@ -45,15 +45,7 @@ Requirements: JDK 21 and an Android SDK with platform 36.
 ./gradlew assembleDebug
 ```
 
-Debug builds are signed with a local, git-ignored `debug.keystore` in the repo root. Create one with:
-
-```bash
-keytool -genkeypair -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-```
-
-Debug builds also seed demo subscriptions and show "Test Sample" import buttons; release builds do not.
-
-Release builds read the signing key from `KEYSTORE_PATH`, `STORE_PASSWORD` and `KEY_PASSWORD`.
+Debug builds use the standard Android debug keystore. Release builds read the signing key from `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_PASSWORD` (and optionally `KEY_ALIAS`, default `upload`); without them the release build is unsigned.
 
 ## Releasing
 

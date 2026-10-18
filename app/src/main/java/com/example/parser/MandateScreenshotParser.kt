@@ -31,7 +31,7 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
     )
 
     override fun parseOcrDocument(document: OcrDocument, sourceAppHint: String?): List<ParsedMandateCandidate> {
-        val allLines = document.allLines.filter { it.text.isNotBlank() }
+        val allLines = document.allLines.filter { it.text.isNotBlank() }.filterNot { isNoiseLine(it.text) }
         if (allLines.isEmpty()) {
             return emptyList()
         }
@@ -141,7 +141,12 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
         }
 
         // 2. Merchant Name Extraction
-        val merchant = extractMerchant(textLines, combinedText)
+        val rawMerchant = extractMerchantFromLayout(cardLines)
+            ?: extractMerchant(textLines, combinedText)
+        // Play Store mandates list the merchant as plain "GOOGLE" with a playstore VPA beneath
+        val merchant = if (rawMerchant.equals("Google", ignoreCase = true) &&
+            textLines.any { it.contains("playstore", ignoreCase = true) }
+        ) "Google Play" else rawMerchant
 
         // 3. Frequency Extraction
         val frequency = extractFrequency(combinedText)
@@ -167,9 +172,9 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
         val reason = buildString {
             append("Detected in $detectedApp. ")
             if (maxAmount != null && maxAmount > amount && amount > 0) {
-                append("Current debit: ₹$amount (Max: ₹$maxAmount). ")
+                append("Current debit: ₹${formatRupees(amount)} (Max: ₹${formatRupees(maxAmount)}). ")
             } else if (maxAmount != null) {
-                append("Mandate limit up to ₹$maxAmount. ")
+                append("Mandate limit up to ₹${formatRupees(maxAmount)}. ")
             }
             if (nextDate != null) append("Next debit scheduled for $nextDate. ")
             if (last4 != null) append("Linked to account ending in $last4. ")
@@ -256,6 +261,9 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
         return Pair(detectedAmount, detectedMax)
     }
 
+    private fun formatRupees(value: Double): String =
+        if (value % 1.0 == 0.0) value.toLong().toString() else String.format(Locale.ENGLISH, "%.2f", value)
+
     private fun hasAmount(text: String): Boolean {
         return text.contains("₹") || text.contains("Rs", ignoreCase = true) || text.contains("INR", ignoreCase = true)
     }
@@ -270,29 +278,78 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
             }
         }
 
+        // A Play Store mandate shows the merchant as "GOOGLE" with a playstore VPA beneath it
+        if (lines.any { it.contains("playstore", ignoreCase = true) }) {
+            return "Google Play"
+        }
+
         // Otherwise, inspect the lines in the card and pick the most prominent non-UI line
         for (line in lines) {
             val clean = line.replace(Regex("^[•*\\->\\s]+"), "").trim()
-            val lower = clean.lowercase()
-
-            if (clean.length in 3..40 &&
-                !hasAmount(clean) &&
-                !ignoredUiWords.contains(lower) &&
-                !isDateString(clean) &&
-                !lower.startsWith("account") &&
-                !lower.startsWith("ending in") &&
-                !lower.startsWith("next") &&
-                !lower.startsWith("debited") &&
-                !lower.startsWith("up to") &&
-                !lower.startsWith("max") &&
-                !lower.startsWith("limit") &&
-                clean.count { it.isLetter() } > clean.count { it.isDigit() }
-            ) {
-                return clean
+            if (isPlausibleMerchantText(clean)) {
+                return tidyCase(clean)
             }
         }
 
         return "UPI Autopay Mandate"
+    }
+
+
+    private val noisePhrases = listOf(
+        "automatic payments", "set up once", "never miss a deadline", "how to use autopay",
+        "easily manage autopay", "other apps on google pay", "transfer now"
+    )
+
+    private fun isNoiseLine(text: String): Boolean {
+        val lower = text.lowercase().trim()
+        return lower in setOf("live", "pending", "completed") || noisePhrases.any { lower.contains(it) }
+    }
+
+    private fun isPlausibleMerchantText(clean: String): Boolean {
+        val lower = clean.lowercase()
+        return clean.length in 3..40 &&
+            !hasAmount(clean) &&
+            !clean.contains('@') &&
+            !ignoredUiWords.contains(lower) &&
+            !isDateString(clean) &&
+            !lower.startsWith("account") &&
+            !lower.startsWith("ending in") &&
+            !lower.startsWith("next") &&
+            !lower.startsWith("debited") &&
+            !lower.startsWith("up to") &&
+            !lower.startsWith("max") &&
+            !lower.startsWith("limit") &&
+            !lower.startsWith("autopay") &&
+            !lower.contains("payment completed") &&
+            !lower.startsWith("as presented") &&
+            clean.count { it.isLetter() } > clean.count { it.isDigit() }
+    }
+
+    // ALL-CAPS merchant names from some apps ("GOOGLE") read better in title case
+    private fun tidyCase(name: String): String {
+        val letters = name.filter { it.isLetter() }
+        if (letters.isEmpty() || letters != letters.uppercase()) return name
+        return name.lowercase().split(" ").joinToString(" ") { w ->
+            w.replaceFirstChar { it.titlecase(Locale.ENGLISH) }
+        }
+    }
+
+    /**
+     * Uses bounding boxes: in list layouts the merchant sits on the same row as the amount,
+     * to its left (e.g. "GOOGLE ........ Up to ₹1,999"). Returns null when no such row exists.
+     */
+    private fun extractMerchantFromLayout(cardLines: List<OcrTextLine>): String? {
+        val amountLine = cardLines.firstOrNull { hasAmount(it.text) || it.text.contains("up to", ignoreCase = true) }
+        val amountBox = amountLine?.boundingBox ?: return null
+        val candidates = cardLines.filter { line ->
+            val box = line.boundingBox
+            line !== amountLine && box != null &&
+                abs(box.centerY - amountBox.centerY) <= maxOf(box.height, amountBox.height) / 2 &&
+                box.left < amountBox.left &&
+                isPlausibleMerchantText(line.text.trim())
+        }
+        val best = candidates.minByOrNull { it.boundingBox!!.left } ?: return null
+        return tidyCase(best.text.trim())
     }
 
     private fun isLikelyMerchantLine(text: String): Boolean {

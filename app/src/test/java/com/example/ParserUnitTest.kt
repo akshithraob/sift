@@ -346,4 +346,39 @@ class ParserUnitTest {
         assertEquals("Hungama Digital", result[0].merchant)
         assertEquals(1999.0, result[0].amount, 0.01)
     }
+
+    @Test
+    fun testScreenshotParser_googlePayAutomaticPaymentsRealLayout() {
+        fun line(text: String, l: Int, t: Int, r: Int, b: Int) =
+            OcrTextLine(text, OcrBoundingBox(l, t, r, b))
+
+        // Synthetic reproduction of the GPay "Automatic payments" (Live tab) layout, 720px wide
+        val lines = listOf(
+            line("Automatic payments", 45, 235, 536, 285),
+            line("Set up once and never miss a deadline", 45, 310, 521, 345),
+            line("How to use Autopay", 90, 420, 346, 452),
+            line("Live", 95, 565, 145, 598),
+            line("Pending", 308, 565, 412, 598),
+            line("Completed", 528, 565, 671, 598),
+            line("GOOGLE", 150, 680, 281, 712),
+            line("Up to ₹1,999", 503, 680, 675, 712),
+            line("playstore1.bd@axis...", 150, 722, 407, 756),
+            line("As presented", 506, 722, 675, 756),
+            line("Autopay on • 1 payment completed", 195, 786, 578, 820),
+            line("Easily manage Autopay from", 182, 945, 588, 980),
+            line("other apps on Google Pay", 182, 990, 549, 1025),
+            line("Transfer now", 182, 1055, 347, 1088)
+        )
+        val result = DefaultMandateScreenshotParser()
+            .parseOcrDocument(OcrDocument(listOf(OcrTextBlock("", null, lines))), "Google Pay")
+
+        assertEquals(1, result.size)
+        val m = result[0]
+        assertEquals("Google Play", m.merchant)
+        assertEquals(1999.0, m.amount, 0.01)
+        assertEquals(1999.0, m.maxAmount ?: 0.0, 0.01)
+        assertEquals(Frequency.AS_PRESENTED, m.frequency)
+        // The VPA must never be carried into the candidate
+        assertTrue(m.confidenceReason.none { it == '@' })
+    }
 }

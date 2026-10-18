@@ -32,7 +32,7 @@ class MainActivity : FragmentActivity() {
 
         // Strict Security: Block screenshots and screen recording in release builds
         // Note: In debug builds on the browser streaming emulator, FLAG_SECURE blacks out the canvas
-        if (!BuildConfig.DEBUG) {
+        if (!BuildConfig.ALLOW_SCREEN_CAPTURE) {
             window.setFlags(
                 WindowManager.LayoutParams.FLAG_SECURE,
                 WindowManager.LayoutParams.FLAG_SECURE

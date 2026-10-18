@@ -236,8 +236,8 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (com.leakproof.app.BuildConfig.DEBUG) {
-                                    "Off in debug builds. Release builds block screenshots and screen recording across the entire app."
+                                text = if (com.leakproof.app.BuildConfig.ALLOW_SCREEN_CAPTURE) {
+                                    "Off in this debug/demo build. The release build blocks screenshots and screen recording across the entire app."
                                 } else {
                                     "Active. Screenshots and screen recording are blocked across the entire app."
                                 },

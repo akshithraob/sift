@@ -410,7 +410,8 @@ fun CandidateReviewCard(
                     )
                     if (!candidate.sourceApp.isNullOrBlank()) {
                         Text(
-                            text = "Detected in ${candidate.sourceApp}",
+                            text = "Detected in ${candidate.sourceApp}" +
+                                if (candidate.kind != com.leakproof.app.parser.RecurringKind.SUBSCRIPTION) " · ${candidate.kind.label}" else "",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

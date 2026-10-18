@@ -198,7 +198,9 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
             sourceApp = detectedApp,
             last4 = last4,
             confidence = confidence,
-            confidenceReason = reason
+            confidenceReason = reason,
+            kind = KindClassifier.classify("$merchant $combinedText"),
+            endDateEpochMs = endDate?.takeIf { it != "Until Revoked" }?.let { parseDateStrToMillis(it) }?.takeIf { it > 0 }
         )
     }
 

@@ -54,7 +54,9 @@ data class ParsedMandateCandidate(
     val last4: String? = null,
     val confidence: Confidence = Confidence.HIGH,
     val confidenceReason: String = "",
-    val rawNarration: String? = null
+    val rawNarration: String? = null,
+    val kind: RecurringKind = RecurringKind.SUBSCRIPTION,
+    val endDateEpochMs: Long? = null
 )
 
 data class RawTransactionLine(

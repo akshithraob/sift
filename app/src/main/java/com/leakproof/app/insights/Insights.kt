@@ -60,7 +60,8 @@ object OverlapDetector {
     )
 
     fun detect(subscriptions: List<SubscriptionEntity>): List<OverlapInsight> {
-        val active = subscriptions.filter { it.status == "ACTIVE" }
+        // Two EMIs or two SIPs are not "paying twice": only subscriptions can overlap
+        val active = subscriptions.filter { it.status == "ACTIVE" && it.kind == "SUBSCRIPTION" }
         val result = mutableListOf<OverlapInsight>()
 
         // Exactly the same service tracked more than once (e.g. mandates created in two UPI apps)
@@ -267,7 +268,7 @@ object Trials {
 
 enum class LeakSeverity { HIGH, MEDIUM }
 
-enum class LeakKind { OVER_BUDGET, NEAR_BUDGET, TRIAL, DUPLICATE, OVERLAP, MANDATE_LIMIT }
+enum class LeakKind { OVER_BUDGET, NEAR_BUDGET, TRIAL, DUPLICATE, OVERLAP, HIGH_INTEREST, MANDATE_LIMIT }
 
 data class Leak(
     val kind: LeakKind,
@@ -281,6 +282,7 @@ data class Leak(
 object LeakFinder {
 
     private const val TRIAL_WARNING_DAYS = 14
+    private const val HIGH_INTEREST_PCT = 18.0
 
     fun find(
         subscriptions: List<SubscriptionEntity>,
@@ -330,6 +332,19 @@ object LeakFinder {
                     "${insight.merchants.joinToString(" + ")} together cost ${CurrencyFormatter.format(insight.monthlyTotal)}/month. " +
                         if (insight.kind == OverlapKind.DUPLICATE) "Keep one and cancel the other." else "Keep the one you use most?",
                     insight.subscriptionIds
+                )
+            )
+        }
+
+        for (sub in subscriptions.filter { it.status == "ACTIVE" && it.kind == "EMI" }) {
+            val rate = sub.interestRatePct ?: continue
+            if (rate < HIGH_INTEREST_PCT) continue
+            leaks.add(
+                Leak(
+                    LeakKind.HIGH_INTEREST, LeakSeverity.MEDIUM,
+                    "High-interest loan: ${sub.merchant} at ${"%.1f".format(java.util.Locale.ENGLISH, rate)}%",
+                    "Part payments cost less than paying interest for the full term. Open it to see what an extra payment would save.",
+                    listOf(sub.id)
                 )
             )
         }

@@ -295,6 +295,11 @@ fun SubscriptionDetailScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            if (subscription.kind == "EMI") {
+                com.leakproof.app.ui.components.EmiProgressCard(subscription)
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
             // "HOW TO CANCEL" SECTION
             Card(
                 shape = RoundedCornerShape(20.dp),

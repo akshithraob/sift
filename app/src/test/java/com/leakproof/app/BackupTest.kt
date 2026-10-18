@@ -179,10 +179,10 @@ class BackupTest {
         )
         val lines = csv.split("\r\n")
 
-        assertEquals("Merchant,Amount (INR),Frequency,Next renewal,Payment rail,Status,Source,Account last 4,Trial ends,Mandate limit (INR),Notes", lines[0])
+        assertEquals("Merchant,Amount (INR),Frequency,Next renewal,Payment rail,Status,Source,Account last 4,Trial ends,Mandate limit (INR),Notes,Type,Instalments paid,Instalments total,Ends,Interest rate (%)", lines[0])
         // The formula is prefixed with a quote so spreadsheets treat it as text
         assertTrue(csv.contains("\"'=HYPERLINK(\"\"http://evil\"\")\""))
         assertTrue(csv.contains("\"line1\nline2, with comma\""))
-        assertTrue(csv.contains("Claude,1999.00,MONTHLY,20 Oct 2026,UPI,ACTIVE,SCREENSHOT,4821,,1999.00,"))
+        assertTrue(csv.contains("Claude,1999.00,MONTHLY,20 Oct 2026,UPI,ACTIVE,SCREENSHOT,4821,,1999.00,,SUBSCRIPTION"))
     }
 }

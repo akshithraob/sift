@@ -22,5 +22,12 @@ data class SubscriptionEntity(
     val maxAmount: Double? = null,          // Mandate limit ("up to"), when the source shows one
     val trialEndEpochMs: Long? = null,      // Set for free trials; drives the "trial ends" reminder
     @ColumnInfo(defaultValue = "0")
-    val lastSeenAtMs: Long = 0              // Last time an import still showed this mandate
+    val lastSeenAtMs: Long = 0,             // Last time an import still showed this mandate
+    @ColumnInfo(defaultValue = "'SUBSCRIPTION'")
+    val kind: String = "SUBSCRIPTION",      // SUBSCRIPTION, EMI, SIP, INSURANCE
+    val installmentsTotal: Int? = null,     // EMIs: how many instalments in all
+    val installmentsPaid: Int? = null,      // EMIs: how many are already paid
+    val endEpochMs: Long? = null,           // EMIs/SIPs: when the last debit is due, if known
+    val interestRatePct: Double? = null,    // EMIs: yearly interest, if the user knows it
+    val outstanding: Double? = null         // EMIs: remaining principal, if the user knows it
 )

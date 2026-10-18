@@ -285,6 +285,11 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
         source: String = "MANUAL",
         last4: String?,
         notes: String?,
+        kind: String = "SUBSCRIPTION",
+        installmentsTotal: Int? = null,
+        installmentsPaid: Int? = null,
+        interestRatePct: Double? = null,
+        outstanding: Double? = null,
         onComplete: () -> Unit
     ) {
         viewModelScope.launch {
@@ -306,7 +311,13 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
                 notes = notes,
                 maxAmount = old?.maxAmount,
                 trialEndEpochMs = trialEndEpochMs,
-                lastSeenAtMs = old?.lastSeenAtMs ?: 0L
+                lastSeenAtMs = old?.lastSeenAtMs ?: 0L,
+                kind = kind,
+                installmentsTotal = installmentsTotal,
+                installmentsPaid = installmentsPaid,
+                endEpochMs = old?.endEpochMs,
+                interestRatePct = interestRatePct,
+                outstanding = outstanding
             )
             if (id == 0L) {
                 repository.insertSubscription(entity)

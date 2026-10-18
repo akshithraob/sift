@@ -83,6 +83,12 @@ fun ManualAddEditScreen(
         mutableStateOf(existing?.trialEndEpochMs?.let { dateFormat.format(java.util.Date(it)) } ?: "")
     }
 
+    var kind by remember { mutableStateOf(existing?.kind ?: "SUBSCRIPTION") }
+    var totalText by remember { mutableStateOf(existing?.installmentsTotal?.toString() ?: "") }
+    var paidText by remember { mutableStateOf(existing?.installmentsPaid?.toString() ?: "") }
+    var rateText by remember { mutableStateOf(existing?.interestRatePct?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
+    var outstandingText by remember { mutableStateOf(existing?.outstanding?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
+
     var frequencyExpanded by remember { mutableStateOf(false) }
     var railExpanded by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -182,6 +188,75 @@ fun ManualAddEditScreen(
                     .fillMaxWidth()
                     .testTag("amount_input_field")
             )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // What the payment is for
+            Text(
+                text = "WHAT IS IT?",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 0.8.sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                items(com.leakproof.app.parser.RecurringKind.entries.toList()) { k ->
+                    androidx.compose.material3.FilterChip(
+                        selected = kind == k.name,
+                        onClick = { kind = k.name; errorMessage = null },
+                        label = { Text(k.label, fontSize = 12.sp) },
+                        modifier = Modifier.testTag("kind_${k.name}")
+                    )
+                }
+            }
+
+            if (kind == "EMI") {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = totalText,
+                        onValueChange = { totalText = it.filter { c -> c.isDigit() }.take(3); errorMessage = null },
+                        label = { Text("Total instalments") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).testTag("emi_total_field")
+                    )
+                    OutlinedTextField(
+                        value = paidText,
+                        onValueChange = { paidText = it.filter { c -> c.isDigit() }.take(3); errorMessage = null },
+                        label = { Text("Already paid") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).testTag("emi_paid_field")
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = rateText,
+                        onValueChange = { rateText = it.filter { c -> c.isDigit() || c == '.' }.take(5); errorMessage = null },
+                        label = { Text("Interest % / year") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).testTag("emi_rate_field")
+                    )
+                    OutlinedTextField(
+                        value = outstandingText,
+                        onValueChange = { outstandingText = it.filter { c -> c.isDigit() || c == '.' }.take(10); errorMessage = null },
+                        label = { Text("Balance left (₹)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).testTag("emi_outstanding_field")
+                    )
+                }
+                Text(
+                    "Optional: the rate and balance let Leakproof estimate what an extra payment would save.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -366,6 +441,13 @@ fun ManualAddEditScreen(
                         return@Button
                     }
 
+                    val totalInstalments = totalText.toIntOrNull()
+                    val paidInstalments = paidText.toIntOrNull()
+                    if (kind == "EMI" && totalInstalments != null && (paidInstalments ?: 0) > totalInstalments) {
+                        errorMessage = "Instalments paid can't be more than the total"
+                        return@Button
+                    }
+
                     val trialEndMs: Long? = if (isTrial) {
                         val parsed = runCatching { dateFormat.parse(trialEndText.trim())?.time }.getOrNull()
                         if (parsed == null) {
@@ -384,6 +466,11 @@ fun ManualAddEditScreen(
                         nextDate = nextDate.trim().ifBlank { "Upcoming" },
                         nextDateEpochMs = nextDateMs,
                         trialEndEpochMs = trialEndMs,
+                        kind = kind,
+                        installmentsTotal = if (kind == "EMI") totalInstalments else null,
+                        installmentsPaid = if (kind == "EMI") paidInstalments else null,
+                        interestRatePct = if (kind == "EMI") rateText.toDoubleOrNull() else null,
+                        outstanding = if (kind == "EMI") outstandingText.toDoubleOrNull() else null,
                         rail = rail,
                         source = existing?.source ?: "MANUAL",
                         last4 = last4.ifBlank { null },

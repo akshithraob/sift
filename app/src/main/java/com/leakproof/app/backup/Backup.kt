@@ -113,7 +113,7 @@ data class BackupContents(
 
 object BackupCodec {
     private const val FORMAT = "leakproof-backup"
-    private const val VERSION = 2
+    private const val VERSION = 3
 
     fun encode(subscriptions: List<SubscriptionEntity>, monthlyBudget: Double, nowMs: Long = System.currentTimeMillis()): ByteArray {
         val array = JSONArray()
@@ -134,6 +134,12 @@ object BackupCodec {
                     .put("maxAmount", s.maxAmount ?: JSONObject.NULL)
                     .put("trialEndEpochMs", s.trialEndEpochMs ?: JSONObject.NULL)
                     .put("lastSeenAtMs", s.lastSeenAtMs)
+                    .put("kind", s.kind)
+                    .put("installmentsTotal", s.installmentsTotal ?: JSONObject.NULL)
+                    .put("installmentsPaid", s.installmentsPaid ?: JSONObject.NULL)
+                    .put("endEpochMs", s.endEpochMs ?: JSONObject.NULL)
+                    .put("interestRatePct", s.interestRatePct ?: JSONObject.NULL)
+                    .put("outstanding", s.outstanding ?: JSONObject.NULL)
             )
         }
         val root = JSONObject()
@@ -170,7 +176,13 @@ object BackupCodec {
                     notes = if (o.isNull("notes")) null else o.optString("notes").ifBlank { null },
                     maxAmount = if (o.isNull("maxAmount")) null else o.optDouble("maxAmount"),
                     trialEndEpochMs = if (o.isNull("trialEndEpochMs")) null else o.optLong("trialEndEpochMs"),
-                    lastSeenAtMs = o.optLong("lastSeenAtMs", 0L)
+                    lastSeenAtMs = o.optLong("lastSeenAtMs", 0L),
+                    kind = o.optString("kind", "SUBSCRIPTION").ifBlank { "SUBSCRIPTION" },
+                    installmentsTotal = if (o.isNull("installmentsTotal")) null else o.optInt("installmentsTotal"),
+                    installmentsPaid = if (o.isNull("installmentsPaid")) null else o.optInt("installmentsPaid"),
+                    endEpochMs = if (o.isNull("endEpochMs")) null else o.optLong("endEpochMs"),
+                    interestRatePct = if (o.isNull("interestRatePct")) null else o.optDouble("interestRatePct"),
+                    outstanding = if (o.isNull("outstanding")) null else o.optDouble("outstanding")
                 )
             }
             return BackupContents(subs, root.optDouble("monthlyBudget", 0.0).let { if (it.isNaN()) 0.0 else it }, root.optLong("createdAt", 0L))
@@ -201,7 +213,8 @@ object BackupMerge {
 object CsvExport {
     private val header = listOf(
         "Merchant", "Amount (INR)", "Frequency", "Next renewal", "Payment rail", "Status",
-        "Source", "Account last 4", "Trial ends", "Mandate limit (INR)", "Notes"
+        "Source", "Account last 4", "Trial ends", "Mandate limit (INR)", "Notes",
+        "Type", "Instalments paid", "Instalments total", "Ends", "Interest rate (%)"
     )
 
     fun toCsv(subscriptions: List<SubscriptionEntity>): String {
@@ -221,7 +234,12 @@ object CsvExport {
                     s.last4.orEmpty(),
                     s.trialEndEpochMs?.let { fmt.format(java.util.Date(it)) }.orEmpty(),
                     s.maxAmount?.let { "%.2f".format(java.util.Locale.ROOT, it) }.orEmpty(),
-                    s.notes.orEmpty()
+                    s.notes.orEmpty(),
+                    s.kind,
+                    s.installmentsPaid?.toString().orEmpty(),
+                    s.installmentsTotal?.toString().orEmpty(),
+                    s.endEpochMs?.let { fmt.format(java.util.Date(it)) }.orEmpty(),
+                    s.interestRatePct?.let { "%.2f".format(java.util.Locale.ROOT, it) }.orEmpty()
                 ).joinToString(",") { escape(it) }
             ).append("\r\n")
         }

@@ -61,7 +61,8 @@ class SubscriptionRepository(private val dao: SubscriptionDao) {
                     last4 = c.last4?.takeLast(4) ?: old.last4,
                     status = "ACTIVE",
                     maxAmount = c.maxAmount ?: old.maxAmount,
-                    lastSeenAtMs = now
+                    lastSeenAtMs = now,
+                    endEpochMs = c.endDateEpochMs ?: old.endEpochMs
                 )
             )
         }
@@ -80,7 +81,9 @@ class SubscriptionRepository(private val dao: SubscriptionDao) {
                     status = "ACTIVE",
                     userConfirmed = true,
                     maxAmount = candidate.maxAmount,
-                    lastSeenAtMs = now
+                    lastSeenAtMs = now,
+                    kind = candidate.kind.name,
+                    endEpochMs = candidate.endDateEpochMs
                 )
             }
         )

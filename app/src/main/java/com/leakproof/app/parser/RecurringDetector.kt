@@ -112,7 +112,8 @@ class DefaultRecurringDetector : RecurringDetector {
                             sourceApp = "Bank Statement",
                             last4 = last4,
                             confidence = confidence,
-                            confidenceReason = reason
+                            confidenceReason = reason,
+                            kind = KindClassifier.classify(normalizedMerchant + " " + txGroup.first().description)
                         )
                     )
                 }
@@ -135,7 +136,8 @@ class DefaultRecurringDetector : RecurringDetector {
                         sourceApp = "Bank Statement",
                         last4 = last4,
                         confidence = Confidence.HIGH,
-                        confidenceReason = "Identified recurring Autopay/Mandate keyword in bank narration"
+                        confidenceReason = "Identified recurring Autopay/Mandate keyword in bank narration",
+                        kind = KindClassifier.classify(normalizedMerchant + " " + singleTx.description)
                     )
                 )
             }

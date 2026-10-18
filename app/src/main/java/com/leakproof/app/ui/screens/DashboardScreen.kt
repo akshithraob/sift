@@ -70,7 +70,10 @@ import com.leakproof.app.insights.Leak
 import com.leakproof.app.insights.LeakFinder
 import com.leakproof.app.insights.LeakKind
 import com.leakproof.app.insights.LeakSeverity
+import com.leakproof.app.insights.KindBreakdown
 import com.leakproof.app.insights.Trials
+import com.leakproof.app.ui.components.DebtFreeCard
+import com.leakproof.app.ui.components.KindSplitCard
 import com.leakproof.app.insights.monthlyCost
 import com.leakproof.app.ui.components.AppCard
 import com.leakproof.app.ui.components.BrandMark
@@ -109,6 +112,9 @@ fun DashboardScreen(
     val totalMonthly = active.sumOf { monthlyCost(it.amount, it.frequency) }
     val budget = Budget.evaluate(totalMonthly, monthlyBudget)
     val leaks = remember(subscriptions, budget) { LeakFinder.find(subscriptions, budget) }
+
+    val kindSplit = remember(subscriptions) { KindBreakdown.monthlyByKind(subscriptions) }
+    val emis = active.filter { it.kind == "EMI" }
 
     val comingUp = active
         .filter { Trials.daysUntil(it.nextDateEpochMs) in 0..7 }
@@ -172,6 +178,13 @@ fun DashboardScreen(
         ) {
             item { Hero(totalMonthly = totalMonthly, activeCount = active.size, budget = budget) }
 
+            if (kindSplit.size > 1) {
+                item {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    KindSplitCard(kindSplit)
+                }
+            }
+
             item {
                 SectionTitle("Leaks found") {
                     if (leaks.isNotEmpty()) {
@@ -182,6 +195,13 @@ fun DashboardScreen(
                     }
                 }
                 LeaksCard(leaks)
+            }
+
+            if (emis.isNotEmpty()) {
+                item {
+                    SectionTitle("Debt-free plan")
+                    DebtFreeCard(subscriptions)
+                }
             }
 
             if (comingUp.isNotEmpty()) {
@@ -336,7 +356,7 @@ private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus) {
 // ---------------------------------------------------------------- Leaks
 
 private fun Leak.icon(): ImageVector = when (kind) {
-    LeakKind.OVER_BUDGET, LeakKind.NEAR_BUDGET -> Icons.Default.TrendingUp
+    LeakKind.OVER_BUDGET, LeakKind.NEAR_BUDGET, LeakKind.HIGH_INTEREST -> Icons.Default.TrendingUp
     LeakKind.TRIAL -> Icons.Default.HourglassBottom
     LeakKind.DUPLICATE, LeakKind.OVERLAP -> Icons.Default.ContentCopy
     LeakKind.MANDATE_LIMIT -> Icons.Default.Warning
@@ -519,7 +539,7 @@ private fun SubscriptionRow(subscription: SubscriptionEntity, onClick: () -> Uni
                     color = if (inactive) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    "$railLabel · ${subscription.frequency.lowercase().replace('_', ' ')}" +
+                    kindPrefix(subscription) + "$railLabel · ${subscription.frequency.lowercase().replace('_', ' ')}" +
                         (subscription.last4?.takeIf { it.isNotBlank() }?.let { " · ••$it" } ?: ""),
                     fontSize = 12.sp,
                     maxLines = 1,
@@ -557,6 +577,16 @@ private fun SubscriptionRow(subscription: SubscriptionEntity, onClick: () -> Uni
             }
         }
     }
+}
+
+// "EMI · 7 of 24 paid · " for loans, "Investment (SIP) · " for the other non-subscription kinds
+private fun kindPrefix(sub: SubscriptionEntity): String {
+    val kind = com.leakproof.app.parser.RecurringKind.fromName(sub.kind)
+    if (kind == com.leakproof.app.parser.RecurringKind.SUBSCRIPTION) return ""
+    val progress = if (kind == com.leakproof.app.parser.RecurringKind.EMI && sub.installmentsTotal != null && sub.installmentsPaid != null) {
+        " ${sub.installmentsPaid} of ${sub.installmentsTotal} paid"
+    } else ""
+    return kind.label + progress + " · "
 }
 
 // ---------------------------------------------------------------- Empty state

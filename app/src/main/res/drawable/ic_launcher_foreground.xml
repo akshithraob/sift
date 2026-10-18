@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/subtrack_launcher_icon_1792255577106"
+        android:drawable="@drawable/leakproof_launcher_icon_1792255577106"
         android:gravity="center" />
 </layer-list>

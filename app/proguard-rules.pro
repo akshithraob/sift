@@ -1,4 +1,4 @@
-# SubTrack ProGuard / R8 Rules
+# Leakproof ProGuard / R8 Rules
 # Privacy & Security: Strip all Log calls in release builds
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);

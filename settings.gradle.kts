@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "SubTrack"
+rootProject.name = "Leakproof"
 
 include(":app")

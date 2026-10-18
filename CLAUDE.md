@@ -1,4 +1,4 @@
-# SubTrack — Project Context for Claude
+# Leakproof — Project Context for Claude
 
 ## What this app is
 A native Android subscription manager for Indian users. It finds the user's recurring payments (UPI Autopay mandates, e-NACH/ACH debits, standing instructions, card subscriptions) **without manual entry**, then helps them track and cancel them.

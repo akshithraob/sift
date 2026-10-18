@@ -1,5 +1,5 @@
 {
-  "name": "SubTrack",
+  "name": "Leakproof",
   "description": "On-device manager for UPI Autopay mandates, e-NACH debits, and recurring subscriptions with zero network tracking.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

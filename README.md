@@ -1,8 +1,8 @@
-# SubTrack
+# Leakproof
 
 A native Android app that finds your recurring payments in India (UPI Autopay mandates, e-NACH/ACH debits, standing instructions, card subscriptions) without manual entry, and helps you track and cancel them.
 
-**Your data never leaves your phone.** SubTrack does not declare the `INTERNET` permission, and has no backend, analytics, crash-reporting or ad SDKs.
+**Your data never leaves your phone.** Leakproof does not declare the `INTERNET` permission, and has no backend, analytics, crash-reporting or ad SDKs.
 
 ## How it finds subscriptions
 
@@ -14,7 +14,7 @@ Picked files are copied to app-private cache, parsed, then deleted in every code
 
 ## Cancelling
 
-SubTrack cannot revoke mandates itself. It deep-links to your UPI app or https://upihelp.npci.org.in and shows step-by-step guides from the bundled `merchants.json`.
+Leakproof cannot revoke mandates itself. It deep-links to your UPI app or https://upihelp.npci.org.in and shows step-by-step guides from the bundled `merchants.json`.
 
 ## Security model
 

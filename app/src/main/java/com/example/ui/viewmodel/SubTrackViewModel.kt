@@ -74,12 +74,24 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
 
     private var backgroundedAtMs = 0L
 
+    private var externalPickerOpen = false
+
+    /** Call right before launching a system picker so coming back from it does not trigger the re-lock. */
+    fun beginExternalPicker() {
+        externalPickerOpen = true
+    }
+
     fun onAppBackgrounded() {
         backgroundedAtMs = android.os.SystemClock.elapsedRealtime()
     }
 
     // Re-lock after a short grace period so system pickers (photos, files) don't force a re-auth
     fun onAppForegrounded() {
+        if (externalPickerOpen) {
+            externalPickerOpen = false
+            backgroundedAtMs = 0L
+            return
+        }
         if (backgroundedAtMs != 0L &&
             android.os.SystemClock.elapsedRealtime() - backgroundedAtMs > RELOCK_GRACE_MS
         ) {

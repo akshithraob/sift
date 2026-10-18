@@ -271,6 +271,7 @@ fun ImportScreen(
                 icon = Icons.Default.Image,
                 iconTint = RailUpi,
                 onPrimaryAction = {
+                    viewModel.beginExternalPicker()
                     photoPickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
@@ -294,6 +295,7 @@ fun ImportScreen(
                 icon = Icons.Default.Description,
                 iconTint = RailNach,
                 onPrimaryAction = {
+                    viewModel.beginExternalPicker()
                     documentPickerLauncher.launch(
                         arrayOf("application/pdf", "text/csv", "text/comma-separated-values")
                     )

@@ -614,7 +614,7 @@ private fun BackupSection(viewModel: SubTrackViewModel) {
                 confirmButton = {
                     Button(
                         enabled = !tooShort && !mismatch,
-                        onClick = { createLauncher.launch("subtrack-backup-$stamp.stbackup") },
+                        onClick = { viewModel.beginExternalPicker(); createLauncher.launch("subtrack-backup-$stamp.stbackup") },
                         colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                         modifier = Modifier.testTag("backup_choose_location_button")
                     ) { Text("Choose where to save") }
@@ -678,7 +678,7 @@ private fun BackupSection(viewModel: SubTrackViewModel) {
                     Button(
                         onClick = {
                             closeDialog()
-                            csvLauncher.launch("subtrack-subscriptions-$stamp.csv")
+                            viewModel.beginExternalPicker(); csvLauncher.launch("subtrack-subscriptions-$stamp.csv")
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                         modifier = Modifier.testTag("csv_export_anyway_button")
@@ -711,7 +711,7 @@ private fun BackupSection(viewModel: SubTrackViewModel) {
             ) { Text("Create encrypted backup") }
             Spacer(modifier = Modifier.height(8.dp))
             androidx.compose.material3.OutlinedButton(
-                onClick = { restoreLauncher.launch(arrayOf("*/*")) },
+                onClick = { viewModel.beginExternalPicker(); restoreLauncher.launch(arrayOf("*/*")) },
                 modifier = Modifier.fillMaxWidth().testTag("restore_backup_button")
             ) { Text("Restore from backup") }
             Spacer(modifier = Modifier.height(8.dp))

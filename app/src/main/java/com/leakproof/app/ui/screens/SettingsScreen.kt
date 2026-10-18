@@ -73,6 +73,7 @@ import com.leakproof.app.ui.viewmodel.LeakproofViewModel
 fun SettingsScreen(
     viewModel: LeakproofViewModel,
     onNavigateBack: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
     onDataWiped: () -> Unit
 ) {
     val context = LocalContext.current
@@ -105,14 +106,14 @@ fun SettingsScreen(
             },
             title = {
                 Text(
-                    text = "Delete All My Data?",
+                    text = "Delete all data & withdraw consent?",
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.error
                 )
             },
             text = {
                 Text(
-                    text = "This will permanently wipe your SQLCipher encrypted database, delete the AES master key from the Android Keystore, and reset all app preferences. This action CANNOT be undone.",
+                    text = "This will permanently wipe your SQLCipher encrypted database, delete the AES master key from the Android Keystore, and reset all app preferences, including your consent. You will be asked to consent again to use the app. This action CANNOT be undone.",
                     lineHeight = 19.sp
                 )
             },
@@ -359,6 +360,40 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Privacy & consent Section
+            SettingsSectionHeader(title = "PRIVACY & CONSENT")
+            val consentAt by viewModel.consentAtMs.collectAsState()
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = if (consentAt > 0) {
+                            "You agreed to the privacy policy (version ${viewModel.consentVersion}) on " +
+                                java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH).format(java.util.Date(consentAt)) + "."
+                        } else "Consent recorded.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("consent_status_text")
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = onOpenPrivacyPolicy,
+                        modifier = Modifier.fillMaxWidth().testTag("open_privacy_policy_button")
+                    ) { Text("Read the privacy policy") }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "To withdraw consent, use \"Delete all my data & withdraw consent\" under Danger zone below.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Backup & export Section
             SettingsSectionHeader(title = "BACKUP & EXPORT")
             BackupSection(viewModel)
@@ -456,7 +491,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Wipe All Data & Keystore Keys",
+                        text = "Withdraw consent & wipe all data",
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = StatusCancelled
@@ -479,7 +514,7 @@ fun SettingsScreen(
                     ) {
                         Icon(imageVector = Icons.Default.DeleteForever, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Delete All My Data", fontWeight = FontWeight.Bold)
+                        Text("Delete all my data & withdraw consent", fontWeight = FontWeight.Bold)
                     }
                 }
             }

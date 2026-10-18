@@ -133,3 +133,45 @@ val verifyNoInternetPermission = tasks.register("verifyNoInternetPermission") {
 
 tasks.matching { it.name in setOf("assembleDebug", "assembleRelease", "bundleRelease", "check") }
   .configureEach { dependsOn(verifyNoInternetPermission) }
+
+// ---- Legal text -------------------------------------------------------------------------------
+// assets/privacy_policy.md is filled in at runtime from res/values/legal.xml. These tasks keep the
+// published copy in sync and stop a release from shipping with the placeholder contact address.
+val exportPrivacyPolicy = tasks.register("exportPrivacyPolicy") {
+  group = "legal"
+  description = "Writes docs/privacy-policy.md (the policy with real values) for hosting at the Play Console URL."
+  val legalXmlFile = file("src/main/res/values/legal.xml")
+  val policyTemplateFile = file("src/main/assets/privacy_policy.md")
+  val publishedPolicyFile = rootProject.file("docs/privacy-policy.md")
+  inputs.files(legalXmlFile, policyTemplateFile)
+  outputs.file(publishedPolicyFile)
+  doLast {
+    val values = Regex("<(?:string|integer) name=\"(\\w+)\"[^>]*>([^<]*)</")
+      .findAll(legalXmlFile.readText()).associate { it.groupValues[1] to it.groupValues[2].trim() }
+    val text = policyTemplateFile.readText()
+      .replace("{{PUBLISHER}}", values.getValue("publisher_name"))
+      .replace("{{PRIVACY_EMAIL}}", values.getValue("privacy_contact_email"))
+      .replace("{{EFFECTIVE_DATE}}", values.getValue("policy_effective_date"))
+      .replace("{{POLICY_VERSION}}", values.getValue("policy_version"))
+    publishedPolicyFile.parentFile.mkdirs()
+    publishedPolicyFile.writeText(text)
+  }
+}
+
+val verifyLegalPlaceholders = tasks.register("verifyLegalPlaceholders") {
+  group = "verification"
+  description = "Fails a release build while the privacy contact email is still the placeholder."
+  val legalXmlFile = file("src/main/res/values/legal.xml")
+  inputs.file(legalXmlFile)
+  doLast {
+    val email = Regex("name=\"privacy_contact_email\"[^>]*>([^<]*)<")
+      .find(legalXmlFile.readText())?.groupValues?.get(1)?.trim().orEmpty()
+    check(email.contains("@") && !email.contains("REPLACE")) {
+      "Set a real address for privacy_contact_email in res/values/legal.xml before building a release " +
+        "(it is shown in the privacy policy and consent notice). Current value: '$email'"
+    }
+  }
+}
+
+tasks.matching { it.name in setOf("assembleRelease", "bundleRelease") }
+  .configureEach { dependsOn(verifyLegalPlaceholders) }

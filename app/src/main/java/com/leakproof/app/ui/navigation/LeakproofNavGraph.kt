@@ -11,7 +11,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.leakproof.app.ui.screens.DashboardScreen
 import com.leakproof.app.ui.screens.ImportScreen
+import com.leakproof.app.ui.screens.ConsentScreen
 import com.leakproof.app.ui.screens.LockScreen
+import com.leakproof.app.ui.screens.PrivacyPolicyScreen
 import com.leakproof.app.ui.screens.ManualAddEditScreen
 import com.leakproof.app.ui.screens.OnboardingScreen
 import com.leakproof.app.ui.screens.ReviewScreen
@@ -20,6 +22,8 @@ import com.leakproof.app.ui.screens.SubscriptionDetailScreen
 import com.leakproof.app.ui.viewmodel.LeakproofViewModel
 
 object Destinations {
+    const val CONSENT = "consent"
+    const val PRIVACY_POLICY = "privacy_policy"
     const val ONBOARDING = "onboarding"
     const val LOCK = "lock"
     const val DASHBOARD = "dashboard"
@@ -39,10 +43,12 @@ fun LeakproofNavGraph(
     viewModel: LeakproofViewModel,
     navController: NavHostController = rememberNavController()
 ) {
+    val isConsentGiven by viewModel.isConsentGiven.collectAsState()
     val isOnboardingCompleted by viewModel.isOnboardingCompleted.collectAsState()
     val isAppLocked by viewModel.isAppLocked.collectAsState()
 
     val startDestination = when {
+        !isConsentGiven -> Destinations.CONSENT
         !isOnboardingCompleted -> Destinations.ONBOARDING
         isAppLocked -> Destinations.LOCK
         else -> Destinations.DASHBOARD
@@ -52,6 +58,27 @@ fun LeakproofNavGraph(
         navController = navController,
         startDestination = startDestination
     ) {
+        composable(Destinations.CONSENT) {
+            val activity = androidx.activity.compose.LocalActivity.current
+            ConsentScreen(
+                onAgree = {
+                    viewModel.giveConsent()
+                    val next = when {
+                        !isOnboardingCompleted -> Destinations.ONBOARDING
+                        isAppLocked -> Destinations.LOCK
+                        else -> Destinations.DASHBOARD
+                    }
+                    navController.navigate(next) { popUpTo(Destinations.CONSENT) { inclusive = true } }
+                },
+                onDecline = { activity?.finishAffinity() },
+                onReadPolicy = { navController.navigate(Destinations.PRIVACY_POLICY) }
+            )
+        }
+
+        composable(Destinations.PRIVACY_POLICY) {
+            PrivacyPolicyScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
         composable(Destinations.ONBOARDING) {
             OnboardingScreen(
                 onComplete = { enableAppLock ->
@@ -142,8 +169,9 @@ fun LeakproofNavGraph(
             SettingsScreen(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() },
+                onOpenPrivacyPolicy = { navController.navigate(Destinations.PRIVACY_POLICY) },
                 onDataWiped = {
-                    navController.navigate(Destinations.ONBOARDING) {
+                    navController.navigate(Destinations.CONSENT) {
                         popUpTo(0) { inclusive = true }
                     }
                 }

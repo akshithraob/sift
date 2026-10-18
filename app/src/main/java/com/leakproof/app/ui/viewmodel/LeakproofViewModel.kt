@@ -43,6 +43,22 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isAppLocked = MutableStateFlow(prefs.isAppLockEnabled)
     val isAppLocked: StateFlow<Boolean> = _isAppLocked.asStateFlow()
 
+    // DPDP consent: valid only for the current policy version, so a changed policy asks again
+    private val policyVersion = application.resources.getInteger(com.leakproof.app.R.integer.policy_version)
+    private val _isConsentGiven = MutableStateFlow(prefs.consentVersion >= policyVersion)
+    val isConsentGiven: StateFlow<Boolean> = _isConsentGiven.asStateFlow()
+    private val _consentAtMs = MutableStateFlow(prefs.consentAtMs)
+    val consentAtMs: StateFlow<Long> = _consentAtMs.asStateFlow()
+    val consentVersion: Int get() = prefs.consentVersion
+
+    fun giveConsent() {
+        val now = System.currentTimeMillis()
+        prefs.consentVersion = policyVersion
+        prefs.consentAtMs = now
+        _consentAtMs.value = now
+        _isConsentGiven.value = true
+    }
+
     // Onboarding state
     private val _isOnboardingCompleted = MutableStateFlow(prefs.isOnboardingCompleted)
     val isOnboardingCompleted: StateFlow<Boolean> = _isOnboardingCompleted.asStateFlow()
@@ -382,8 +398,14 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             com.leakproof.app.reminder.RenewalReminderWorker.schedule(getApplication(), false)
             isNotificationsEnabled.value = false
             _isOnboardingCompleted.value = false
+            _isConsentGiven.value = false
+            _consentAtMs.value = 0L
             _isAppLocked.value = false
             _pendingCandidates.value = emptyList()
+            _missingToCancel.value = emptySet()
+            _backupResult.value = null
+            monthlyBudget.value = 0.0
+            isAppLockSettingEnabled.value = true
             onComplete()
         }
     }

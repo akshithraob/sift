@@ -434,6 +434,30 @@ class ParserUnitTest {
     }
 
     @Test
+    fun testScreenshotParser_playStoreRupeeSymbolMisreadOrMissing() {
+        for (payment in listOf("Next payment: 1,999.00 on 20 Oct 2026", "Next payment: ?1,999.00 on 20 Oct 2026")) {
+            val doc = OcrDocument(
+                listOf(
+                    OcrTextBlock(
+                        "",
+                        null,
+                        listOf(
+                            ocr("Active", 45, 380, 160, 425),
+                            ocr("Claude by Anthropic", 181, 478, 429, 510),
+                            ocr("Claude Pro Subscription", 181, 514, 426, 542),
+                            ocr(payment, 181, 545, 594, 572)
+                        )
+                    )
+                )
+            )
+            val result = DefaultMandateScreenshotParser().parseOcrDocument(doc)
+
+            assertEquals(payment, 1, result.size)
+            assertEquals(1999.0, result[0].amount, 0.01)
+        }
+    }
+
+    @Test
     fun testScreenshotParser_playStoreExpiredSectionIgnored() {
         val doc = OcrDocument(
             listOf(

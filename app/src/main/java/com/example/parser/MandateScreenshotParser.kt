@@ -514,7 +514,8 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
     }
 
     private val playNextPayment = Pattern.compile(
-        "next\\s+payment\\s*:?\\s*(?:₹|Rs\\.?|INR)\\s*([0-9,]+(?:\\.[0-9]{1,2})?)\\s*(?:on\\s+)?" +
+        // The ₹ glyph is often dropped or misread by the Latin OCR model, so the symbol is optional
+        "next\\s+payment\\s*:?\\s*[^0-9\\s]{0,4}\\s*([0-9,]+(?:\\.[0-9]{1,2})?)\\s*(?:on\\s+)?" +
             "([0-3]?[0-9]\\s+[A-Za-z]{3,9}\\s+20[2-3][0-9])",
         Pattern.CASE_INSENSITIVE
     )

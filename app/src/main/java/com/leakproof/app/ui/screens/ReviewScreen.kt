@@ -241,7 +241,7 @@ fun ReviewScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 diff?.let { d ->
-                    if (d.matches.isNotEmpty() || d.missing.isNotEmpty()) {
+                    if (d.matches.isNotEmpty() || d.missing.isNotEmpty() || d.unseen.isNotEmpty()) {
                         item(key = "diff_summary") {
                             ImportDiffSummary(
                                 newCount = d.newCandidates.size,
@@ -273,7 +273,24 @@ fun ReviewScreen(
                 diff?.missing?.takeIf { it.isNotEmpty() }?.let { missing ->
                     item(key = "missing_section") {
                         MissingMandatesCard(
+                            title = "No longer in this import",
+                            body = "These were imported from a UPI app before but aren't in this screenshot. " +
+                                "If you cancelled them, tick them to mark as cancelled. Leave unticked if your screenshot only covers part of the list.",
+                            tag = "missing_mandates_card",
                             missing = missing,
+                            selected = missingToCancel,
+                            onToggle = { viewModel.toggleMissingToCancel(it) }
+                        )
+                    }
+                }
+                diff?.unseen?.takeIf { it.isNotEmpty() }?.let { unseen ->
+                    item(key = "unseen_section") {
+                        MissingMandatesCard(
+                            title = "Not charged in this statement",
+                            body = "These mandates are active in Leakproof, but this statement shows no debit for them. " +
+                                "They may be unused: if so, revoke them in your UPI app, and tick them here to mark them cancelled.",
+                            tag = "unseen_mandates_card",
+                            missing = unseen,
                             selected = missingToCancel,
                             onToggle = { viewModel.toggleMissingToCancel(it) }
                         )
@@ -313,6 +330,9 @@ private fun ImportDiffSummary(newCount: Int, changedCount: Int, alreadyTrackedCo
 
 @Composable
 private fun MissingMandatesCard(
+    title: String,
+    body: String,
+    tag: String,
     missing: List<SubscriptionEntity>,
     selected: Set<Long>,
     onToggle: (Long) -> Unit
@@ -321,18 +341,17 @@ private fun MissingMandatesCard(
         shape = RoundedCornerShape(20.dp),
         border = com.leakproof.app.ui.components.appCardBorder(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = Modifier.fillMaxWidth().testTag("missing_mandates_card")
+        modifier = Modifier.fillMaxWidth().testTag(tag)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "No longer in this import",
+                text = title,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "These were imported from a UPI app before but aren't in this screenshot. " +
-                    "If you cancelled them, tick them to mark as cancelled. Leave unticked if your screenshot only covers part of the list.",
+                text = body,
                 fontSize = 12.sp,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

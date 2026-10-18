@@ -158,9 +158,11 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     // Review-screen insight: what this import adds, changes, or no longer shows
+    private val _statementCoverageDays = MutableStateFlow<Int?>(null)
+
     val importDiff: StateFlow<ImportDiffResult?> =
-        combine(_pendingCandidates, allSubscriptions) { pending, existing ->
-            if (pending.isEmpty()) null else ImportDiff.compare(existing, pending)
+        combine(_pendingCandidates, allSubscriptions, _statementCoverageDays) { pending, existing, coverage ->
+            if (pending.isEmpty()) null else ImportDiff.compare(existing, pending, coverage)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     // Mandates the user ticked as "cancelled" because the import no longer shows them
@@ -179,14 +181,18 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
     ) {
         viewModelScope.launch {
             val cancelIds = if (applyCancellations) {
-                val missingIds = importDiff.value?.missing?.map { it.id }?.toSet().orEmpty()
+                val diff = importDiff.value
+                val missingIds = (diff?.missing.orEmpty() + diff?.unseen.orEmpty()).map { it.id }.toSet()
                 _missingToCancel.value.filter { it in missingIds }
             } else emptyList()
             repository.saveConfirmedCandidates(candidatesToSave, cancelIds)
             prefs.lastImportAtMs = System.currentTimeMillis()
             val savedIds = candidatesToSave.map { it.id }.toSet()
             _pendingCandidates.value = _pendingCandidates.value.filter { it.id !in savedIds }
-            if (applyCancellations || _pendingCandidates.value.isEmpty()) _missingToCancel.value = emptySet()
+            if (applyCancellations || _pendingCandidates.value.isEmpty()) {
+                _missingToCancel.value = emptySet()
+                _statementCoverageDays.value = null
+            }
             onComplete()
         }
     }
@@ -364,6 +370,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 val candidates = app.mlKitOcrScanner.processScreenshots(uris)
                 if (candidates.isNotEmpty()) {
+                    _statementCoverageDays.value = null
                     _pendingCandidates.value = candidates
                     success = true
                 } else {
@@ -385,9 +392,10 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             _importError.value = null
             var success = false
             try {
-                val candidates = app.statementReader.processStatementFile(uri, password)
-                if (candidates.isNotEmpty()) {
-                    _pendingCandidates.value = candidates
+                val imported = app.statementReader.processStatementFile(uri, password)
+                if (imported.candidates.isNotEmpty()) {
+                    _statementCoverageDays.value = imported.coverageDays
+                    _pendingCandidates.value = imported.candidates
                     success = true
                 } else {
                     _importError.value = "No recurring payments were detected in this statement."
@@ -414,6 +422,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             _isAppLocked.value = false
             _pendingCandidates.value = emptyList()
             _missingToCancel.value = emptySet()
+            _statementCoverageDays.value = null
             _backupResult.value = null
             monthlyBudget.value = 0.0
             isAppLockSettingEnabled.value = true

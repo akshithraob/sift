@@ -29,5 +29,6 @@ data class SubscriptionEntity(
     val installmentsPaid: Int? = null,      // EMIs: how many are already paid
     val endEpochMs: Long? = null,           // EMIs/SIPs: when the last debit is due, if known
     val interestRatePct: Double? = null,    // EMIs: yearly interest, if the user knows it
-    val outstanding: Double? = null         // EMIs: remaining principal, if the user knows it
+    val outstanding: Double? = null,        // EMIs: remaining principal, if the user knows it
+    val lastChargedAtMs: Long? = null       // Latest debit seen in an imported statement
 )

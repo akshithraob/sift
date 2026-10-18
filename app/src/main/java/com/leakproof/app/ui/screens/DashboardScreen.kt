@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.leakproof.app.data.local.SubscriptionEntity
 import com.leakproof.app.insights.Budget
+import com.leakproof.app.insights.HealthScore
 import com.leakproof.app.insights.BudgetLevel
 import com.leakproof.app.insights.BudgetStatus
 import com.leakproof.app.insights.Leak
@@ -112,6 +113,7 @@ fun DashboardScreen(
     val totalMonthly = active.sumOf { monthlyCost(it.amount, it.frequency) }
     val budget = Budget.evaluate(totalMonthly, monthlyBudget)
     val leaks = remember(subscriptions, budget) { LeakFinder.find(subscriptions, budget) }
+    val health = remember(subscriptions, leaks) { HealthScore.compute(subscriptions, leaks) }
 
     val kindSplit = remember(subscriptions) { KindBreakdown.monthlyByKind(subscriptions) }
     val emis = active.filter { it.kind == "EMI" }
@@ -176,7 +178,7 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = 96.dp)
         ) {
-            item { Hero(totalMonthly = totalMonthly, activeCount = active.size, budget = budget) }
+            item { Hero(totalMonthly = totalMonthly, activeCount = active.size, budget = budget, health = health) }
 
             if (kindSplit.size > 1) {
                 item {
@@ -289,7 +291,7 @@ fun DashboardScreen(
 // ---------------------------------------------------------------- Hero
 
 @Composable
-private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus) {
+private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus, health: HealthScore?) {
     Box(
         modifier = Modifier
             .padding(top = 6.dp)
@@ -299,13 +301,35 @@ private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus) {
             .testTag("monthly_spend_card")
     ) {
         Column(modifier = Modifier.padding(22.dp)) {
-            Text(
-                text = "YOU PAY EVERY MONTH",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                color = Color.White.copy(alpha = 0.78f)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "YOU PAY EVERY MONTH",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    color = Color.White.copy(alpha = 0.78f)
+                )
+                health?.let {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .testTag("health_pill")
+                    ) {
+                        Text(
+                            text = "Health ${it.score} · ${it.level.label}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = CurrencyFormatter.format(totalMonthly),
@@ -357,7 +381,7 @@ private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus) {
 
 private fun Leak.icon(): ImageVector = when (kind) {
     LeakKind.OVER_BUDGET, LeakKind.NEAR_BUDGET, LeakKind.HIGH_INTEREST -> Icons.Default.TrendingUp
-    LeakKind.TRIAL -> Icons.Default.HourglassBottom
+    LeakKind.TRIAL, LeakKind.STALE_CHARGE -> Icons.Default.HourglassBottom
     LeakKind.DUPLICATE, LeakKind.OVERLAP -> Icons.Default.ContentCopy
     LeakKind.MANDATE_LIMIT -> Icons.Default.Warning
 }

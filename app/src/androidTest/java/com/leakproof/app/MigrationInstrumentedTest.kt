@@ -56,7 +56,7 @@ class MigrationInstrumentedTest {
         }
 
         val room = Room.databaseBuilder(context, AppDatabase::class.java, name)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
             .build()
         try {
             val rows = room.subscriptionDao().getAllOnce()
@@ -71,6 +71,8 @@ class MigrationInstrumentedTest {
             assertNull(row.installmentsTotal)
             assertNull(row.endEpochMs)
             assertNull(row.interestRatePct)
+            // New in version 4: nothing has been matched to a statement yet
+            assertNull(row.lastChargedAtMs)
         } finally {
             room.close()
         }

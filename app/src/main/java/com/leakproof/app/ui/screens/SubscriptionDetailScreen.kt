@@ -234,6 +234,12 @@ fun SubscriptionDetailScreen(
 
                     // Fields Grid
                     DetailFieldRow(label = "Next Debit Date", value = subscription.nextDate)
+                    subscription.lastChargedAtMs?.let {
+                        DetailFieldRow(
+                            label = "Last charged",
+                            value = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH).format(java.util.Date(it))
+                        )
+                    }
                     DetailFieldRow(label = "Frequency", value = subscription.frequency)
                     DetailFieldRow(label = "Payment Rail", value = subscription.rail)
                     DetailFieldRow(label = "Source", value = subscription.source)

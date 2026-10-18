@@ -14,7 +14,8 @@ import kotlin.math.pow
 
 private const val DAY_MS = 24L * 3600 * 1000
 
-private fun stepDays(frequency: String): Double = when (frequency.uppercase()) {
+/** Days in one billing cycle. */
+internal fun frequencyDays(frequency: String): Double = when (frequency.uppercase()) {
     "WEEKLY" -> 7.0
     "QUARTERLY" -> 91.3125
     "YEARLY" -> 365.25
@@ -52,7 +53,7 @@ object EmiMath {
         if (total != null) return max(0, total - (sub.installmentsPaid ?: 0))
         val end = sub.endEpochMs ?: return null
         if (end < sub.nextDateEpochMs) return 0
-        val stepMs = stepDays(sub.frequency) * DAY_MS
+        val stepMs = frequencyDays(sub.frequency) * DAY_MS
         return ((end - sub.nextDateEpochMs) / stepMs).toInt() + 1
     }
 
@@ -60,7 +61,7 @@ object EmiMath {
         sub.endEpochMs?.let { return it }
         val remaining = remainingInstallments(sub) ?: return null
         if (remaining <= 0) return null
-        return sub.nextDateEpochMs + ((remaining - 1) * stepDays(sub.frequency) * DAY_MS).toLong()
+        return sub.nextDateEpochMs + ((remaining - 1) * frequencyDays(sub.frequency) * DAY_MS).toLong()
     }
 
     fun status(sub: SubscriptionEntity): EmiStatus {

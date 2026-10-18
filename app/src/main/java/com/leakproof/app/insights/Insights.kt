@@ -158,7 +158,9 @@ data class ImportDiffResult(
     val newCandidates: List<ParsedMandateCandidate>,
     val matches: List<MatchedCandidate>,
     /** Active, screenshot-sourced UPI mandates that this import no longer shows. */
-    val missing: List<SubscriptionEntity>
+    val missing: List<SubscriptionEntity>,
+    /** Active mandates the imported statement (long enough to judge) shows no debit for. */
+    val unseen: List<SubscriptionEntity> = emptyList()
 ) {
     fun matchFor(candidateId: String): MatchedCandidate? = matches.firstOrNull { it.candidate.id == candidateId }
 }
@@ -166,8 +168,13 @@ data class ImportDiffResult(
 object ImportDiff {
 
     private const val GOOGLE_PLAY = "Google Play"
+    private const val MIN_COVERAGE_DAYS = 60
 
-    fun compare(existing: List<SubscriptionEntity>, candidates: List<ParsedMandateCandidate>): ImportDiffResult {
+    fun compare(
+        existing: List<SubscriptionEntity>,
+        candidates: List<ParsedMandateCandidate>,
+        statementCoverageDays: Int? = null
+    ): ImportDiffResult {
         val taken = mutableSetOf<Long>()
         val matches = mutableListOf<MatchedCandidate>()
         val fresh = mutableListOf<ParsedMandateCandidate>()
@@ -196,7 +203,16 @@ object ImportDiff {
             it.status == "ACTIVE" && it.source == "SCREENSHOT" && it.rail == "UPI" && it.id !in taken
         }
 
-        return ImportDiffResult(fresh, matches, missing)
+        // A statement that spans at least two months can show that an authorised mandate never debited.
+        // Yearly and other long-cycle items are skipped: the statement could not have caught them.
+        val unseen = if (statementCoverageDays == null || statementCoverageDays < MIN_COVERAGE_DAYS ||
+            candidates.none { it.source.name == "STATEMENT" }
+        ) emptyList() else existing.filter {
+            it.status == "ACTIVE" && it.rail in setOf("UPI", "NACH", "SI") && it.id !in taken &&
+                frequencyDays(it.frequency) * 1.2 <= statementCoverageDays
+        }
+
+        return ImportDiffResult(fresh, matches, missing, unseen)
     }
 
     /** Same service by name (price changes still match); the closest amount wins among look-alikes. */
@@ -268,7 +284,7 @@ object Trials {
 
 enum class LeakSeverity { HIGH, MEDIUM }
 
-enum class LeakKind { OVER_BUDGET, NEAR_BUDGET, TRIAL, DUPLICATE, OVERLAP, HIGH_INTEREST, MANDATE_LIMIT }
+enum class LeakKind { OVER_BUDGET, NEAR_BUDGET, TRIAL, DUPLICATE, OVERLAP, HIGH_INTEREST, STALE_CHARGE, MANDATE_LIMIT }
 
 data class Leak(
     val kind: LeakKind,
@@ -349,6 +365,24 @@ object LeakFinder {
             )
         }
 
+        for (sub in subscriptions.filter { it.status == "ACTIVE" }) {
+            val last = sub.lastChargedAtMs ?: continue
+            val cycleDays = frequencyDays(sub.frequency)
+            val sinceDays = (nowMs - last) / DAY_MS
+            // Two and a half missed cycles (and at least two months) is more than a late payment
+            if (sinceDays < maxOf(cycleDays * 2.5, 60.0)) continue
+            val months = (sinceDays / 30.4375).toInt()
+            leaks.add(
+                Leak(
+                    LeakKind.STALE_CHARGE, LeakSeverity.MEDIUM,
+                    "${sub.merchant}: no charge for $months months",
+                    "The last debit we saw was in ${java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.ENGLISH).format(java.util.Date(last))}. " +
+                        "If you no longer use it, revoke the mandate so it can't start charging again.",
+                    listOf(sub.id)
+                )
+            )
+        }
+
         for (risk in MandateRiskAnalyzer.analyze(subscriptions)) {
             leaks.add(
                 Leak(LeakKind.MANDATE_LIMIT, LeakSeverity.MEDIUM, "Mandate limit: ${risk.merchant}", risk.message, listOf(risk.subscriptionId))
@@ -356,5 +390,29 @@ object LeakFinder {
         }
 
         return leaks.sortedWith(compareBy({ it.severity }, { it.kind }))
+    }
+}
+
+// ---------------------------------------------------------------- Health score
+
+enum class HealthLevel(val label: String) { HEALTHY("Healthy"), NEEDS_A_LOOK("Needs a look"), LEAKING("Leaking") }
+
+data class HealthScore(val score: Int, val level: HealthLevel) {
+    companion object {
+        private const val HIGH_PENALTY = 12
+        private const val MEDIUM_PENALTY = 6
+
+        /** 100 minus a penalty per leak; null when there is nothing to judge yet. */
+        fun compute(subscriptions: List<SubscriptionEntity>, leaks: List<Leak>): HealthScore? {
+            if (subscriptions.none { it.status == "ACTIVE" }) return null
+            val penalty = leaks.sumOf { if (it.severity == LeakSeverity.HIGH) HIGH_PENALTY else MEDIUM_PENALTY }
+            val score = (100 - penalty).coerceIn(0, 100)
+            val level = when {
+                score >= 85 -> HealthLevel.HEALTHY
+                score >= 60 -> HealthLevel.NEEDS_A_LOOK
+                else -> HealthLevel.LEAKING
+            }
+            return HealthScore(score, level)
+        }
     }
 }

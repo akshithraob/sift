@@ -28,11 +28,17 @@ class StatementReader(
         }
     }
 
-    suspend fun processStatementFile(uri: Uri, password: String? = null): List<ParsedMandateCandidate> = withContext(Dispatchers.IO) {
+    /** Recurring payments found, and the period the statement covered (null if no dated rows). */
+    data class StatementImport(
+        val candidates: List<ParsedMandateCandidate>,
+        val coverageDays: Int?
+    )
+
+    suspend fun processStatementFile(uri: Uri, password: String? = null): StatementImport = withContext(Dispatchers.IO) {
         val tempFile = createTempCacheFile(uri)
         try {
             if (tempFile == null || !tempFile.exists()) {
-                return@withContext emptyList()
+                return@withContext StatementImport(emptyList(), null)
             }
 
             val filename = uri.lastPathSegment ?: tempFile.name
@@ -50,8 +56,12 @@ class StatementReader(
             // Detect recurring debits
             val candidates = recurringDetector.detectRecurring(rawTransactions)
 
+            // Only the covered period survives from the raw rows; the rows themselves are discarded
+            val dates = rawTransactions.map { it.dateEpochMs }.filter { it > 0 }
+            val coverageDays = if (dates.size >= 2) ((dates.max() - dates.min()) / (24L * 3600 * 1000)).toInt() + 1 else null
+
             // Core Privacy Principle: raw transaction lines are discarded and never kept or stored
-            candidates
+            StatementImport(candidates, coverageDays)
         } finally {
             // Delete temp file immediately after processing
             tempFile?.delete()

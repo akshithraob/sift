@@ -113,7 +113,8 @@ class DefaultRecurringDetector : RecurringDetector {
                             last4 = last4,
                             confidence = confidence,
                             confidenceReason = reason,
-                            kind = KindClassifier.classify(normalizedMerchant + " " + txGroup.first().description)
+                            kind = KindClassifier.classify(normalizedMerchant + " " + txGroup.first().description),
+                            lastDebitEpochMs = sorted.last().dateEpochMs.takeIf { it > 0 }
                         )
                     )
                 }
@@ -137,7 +138,8 @@ class DefaultRecurringDetector : RecurringDetector {
                         last4 = last4,
                         confidence = Confidence.HIGH,
                         confidenceReason = "Identified recurring Autopay/Mandate keyword in bank narration",
-                        kind = KindClassifier.classify(normalizedMerchant + " " + singleTx.description)
+                        kind = KindClassifier.classify(normalizedMerchant + " " + singleTx.description),
+                        lastDebitEpochMs = singleTx.dateEpochMs.takeIf { it > 0 }
                     )
                 )
             }

@@ -62,7 +62,8 @@ class SubscriptionRepository(private val dao: SubscriptionDao) {
                     status = "ACTIVE",
                     maxAmount = c.maxAmount ?: old.maxAmount,
                     lastSeenAtMs = now,
-                    endEpochMs = c.endDateEpochMs ?: old.endEpochMs
+                    endEpochMs = c.endDateEpochMs ?: old.endEpochMs,
+                    lastChargedAtMs = listOfNotNull(old.lastChargedAtMs, c.lastDebitEpochMs).maxOrNull()
                 )
             )
         }
@@ -83,7 +84,8 @@ class SubscriptionRepository(private val dao: SubscriptionDao) {
                     maxAmount = candidate.maxAmount,
                     lastSeenAtMs = now,
                     kind = candidate.kind.name,
-                    endEpochMs = candidate.endDateEpochMs
+                    endEpochMs = candidate.endDateEpochMs,
+                    lastChargedAtMs = candidate.lastDebitEpochMs
                 )
             }
         )

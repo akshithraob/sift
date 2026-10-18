@@ -9,13 +9,20 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.leakproof.app.data.security.KeystoreHelper
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
-@Database(entities = [SubscriptionEntity::class], version = 3, exportSchema = false)
+@Database(entities = [SubscriptionEntity::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun subscriptionDao(): SubscriptionDao
 
     companion object {
         private const val DB_NAME = "leakproof_encrypted_vault.db"
+
+        // v4: the last debit a statement showed, for "not charged lately" and the mandate health check
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN lastChargedAtMs INTEGER")
+            }
+        }
 
         // v3: what a payment is for (subscription, EMI, SIP, insurance) and EMI progress
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -49,7 +56,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         private fun buildDatabase(appContext: Context): AppDatabase {
             val builder = Room.databaseBuilder(appContext, AppDatabase::class.java, DB_NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 
             // Fail closed: never fall back to an unencrypted database
             System.loadLibrary("sqlcipher")

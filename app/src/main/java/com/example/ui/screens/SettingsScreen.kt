@@ -77,6 +77,9 @@ fun SettingsScreen(
     val context = LocalContext.current
     val isAppLockEnabled by viewModel.isAppLockSettingEnabled.collectAsState()
     val isNotificationsEnabled by viewModel.isNotificationsEnabled.collectAsState()
+    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted -> viewModel.setNotificationsEnabled(granted) }
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
 
     fun openBrowserUrl(url: String) {
@@ -230,7 +233,11 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Active. Screenshots and screen recording are blocked across the entire app.",
+                                text = if (com.example.BuildConfig.DEBUG) {
+                                    "Off in debug builds. Release builds block screenshots and screen recording across the entire app."
+                                } else {
+                                    "Active. Screenshots and screen recording are blocked across the entire app."
+                                },
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -283,7 +290,13 @@ fun SettingsScreen(
                     }
                     Switch(
                         checked = isNotificationsEnabled,
-                        onCheckedChange = { viewModel.setNotificationsEnabled(it) },
+                        onCheckedChange = { enable ->
+                            if (enable && !com.example.reminder.RenewalReminderWorker.canNotify(context)) {
+                                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                viewModel.setNotificationsEnabled(enable)
+                            }
+                        },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = BrandPrimary,
                             checkedTrackColor = BrandPrimary.copy(alpha = 0.4f)

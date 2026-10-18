@@ -359,33 +359,36 @@ fun CandidateReviewCard(
                 OutlinedButton(
                     onClick = onDismiss,
                     shape = RoundedCornerShape(10.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusCancelled),
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(imageVector = Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Dismiss", fontSize = 12.sp)
+                    Text("Dismiss", fontSize = 12.sp, maxLines = 1, softWrap = false)
                 }
 
                 OutlinedButton(
                     onClick = onEdit,
                     shape = RoundedCornerShape(10.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Edit", fontSize = 12.sp)
+                    Text("Edit", fontSize = 12.sp, maxLines = 1, softWrap = false)
                 }
 
                 Button(
                     onClick = onConfirm,
                     shape = RoundedCornerShape(10.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                     modifier = Modifier.weight(1.3f)
                 ) {
                     Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Confirm", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Confirm", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                 }
             }
         }

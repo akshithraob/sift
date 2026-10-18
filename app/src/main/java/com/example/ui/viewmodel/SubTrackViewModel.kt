@@ -99,6 +99,7 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
     fun setNotificationsEnabled(enabled: Boolean) {
         prefs.isNotificationsEnabled = enabled
         isNotificationsEnabled.value = enabled
+        com.example.reminder.RenewalReminderWorker.schedule(getApplication(), enabled)
     }
 
     fun selectSubscription(id: Long) {
@@ -265,6 +266,8 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             AppDatabase.wipeDatabase(getApplication())
             prefs.clearAll()
+            com.example.reminder.RenewalReminderWorker.schedule(getApplication(), false)
+            isNotificationsEnabled.value = false
             _isOnboardingCompleted.value = false
             _isAppLocked.value = false
             _pendingCandidates.value = emptyList()

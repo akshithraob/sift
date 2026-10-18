@@ -515,7 +515,9 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
 
     private val playNextPayment = Pattern.compile(
         // The ₹ glyph is often dropped or misread by the Latin OCR model, so the symbol is optional
-        "next\\s+payment\\s*:?\\s*[^0-9\\s]{0,4}\\s*([0-9,]+(?:\\.[0-9]{1,2})?)\\s*(?:on\\s+)?" +
+        // Play always prints two decimals and "on <date>"; that keeps a plain "Next payment: 24 Oct 2026"
+        // line from a UPI app's mandate card from being mistaken for a Play subscription
+        "next\\s+payment\\s*:?\\s*[^0-9\\s]{0,4}\\s*([0-9,]+\\.[0-9]{2})\\s+on\\s+" +
             "([0-3]?[0-9]\\s+[A-Za-z]{3,9}\\s+20[2-3][0-9])",
         Pattern.CASE_INSENSITIVE
     )

@@ -12,6 +12,11 @@ import com.example.parser.Frequency
 import com.example.parser.ParsedMandateCandidate
 import com.example.parser.PaymentRail
 import com.example.parser.SourceType
+import com.example.backup.BackupCodec
+import com.example.backup.BackupCrypto
+import com.example.backup.CsvExport
+import com.example.backup.InvalidBackupException
+import com.example.backup.WrongPassphraseException
 import com.example.insights.ImportDiff
 import com.example.insights.ImportDiffResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -154,6 +159,79 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
             _pendingCandidates.value = _pendingCandidates.value.filter { it.id !in savedIds }
             if (applyCancellations || _pendingCandidates.value.isEmpty()) _missingToCancel.value = emptySet()
             onComplete()
+        }
+    }
+
+    // Backup, restore and export (files are picked by the user through the system file picker)
+    data class BackupResult(val message: String, val isError: Boolean)
+
+    private val _backupResult = MutableStateFlow<BackupResult?>(null)
+    val backupResult: StateFlow<BackupResult?> = _backupResult.asStateFlow()
+
+    fun clearBackupResult() {
+        _backupResult.value = null
+    }
+
+    private val contentResolver get() = getApplication<Application>().contentResolver
+
+    fun createBackup(uri: android.net.Uri, passphrase: CharArray) {
+        viewModelScope.launch {
+            _backupResult.value = try {
+                val subs = repository.getAllOnce()
+                val blob = BackupCrypto.encrypt(BackupCodec.encode(subs, prefs.monthlyBudget), passphrase)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    contentResolver.openOutputStream(uri, "wt")?.use { it.write(blob) }
+                        ?: throw java.io.IOException("no stream")
+                }
+                BackupResult("Encrypted backup saved (${subs.size} subscriptions). Keep your passphrase safe: it can't be recovered.", false)
+            } catch (_: Exception) {
+                BackupResult("Couldn't save the backup file.", true)
+            } finally {
+                passphrase.fill('\u0000')
+            }
+        }
+    }
+
+    fun restoreBackup(uri: android.net.Uri, passphrase: CharArray) {
+        viewModelScope.launch {
+            _backupResult.value = try {
+                val blob = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    contentResolver.openInputStream(uri)?.use { it.readNBytes(MAX_BACKUP_BYTES + 1) }
+                        ?: throw java.io.IOException("no stream")
+                }
+                if (blob.size > MAX_BACKUP_BYTES) throw InvalidBackupException("This file is too large to be a SubTrack backup")
+                val contents = BackupCodec.decode(BackupCrypto.decrypt(blob, passphrase))
+                val plan = repository.restoreMerging(contents.subscriptions)
+                if (prefs.monthlyBudget == 0.0 && contents.monthlyBudget > 0.0) setMonthlyBudget(contents.monthlyBudget)
+                BackupResult(
+                    "Restored ${plan.toInsert.size} subscriptions" +
+                        if (plan.skipped > 0) " (${plan.skipped} already tracked, skipped)." else ".",
+                    false
+                )
+            } catch (_: WrongPassphraseException) {
+                BackupResult("Wrong passphrase, or the file was changed.", true)
+            } catch (e: InvalidBackupException) {
+                BackupResult(e.message ?: "This is not a valid backup.", true)
+            } catch (_: Exception) {
+                BackupResult("Couldn't read that file.", true)
+            } finally {
+                passphrase.fill('\u0000')
+            }
+        }
+    }
+
+    fun exportCsv(uri: android.net.Uri) {
+        viewModelScope.launch {
+            _backupResult.value = try {
+                val csv = CsvExport.toCsv(repository.getAllOnce())
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    contentResolver.openOutputStream(uri, "wt")?.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                        ?: throw java.io.IOException("no stream")
+                }
+                BackupResult("Exported to CSV. The file is not encrypted: store or share it carefully.", false)
+            } catch (_: Exception) {
+                BackupResult("Couldn't save the CSV file.", true)
+            }
         }
     }
 
@@ -323,5 +401,6 @@ class SubTrackViewModel(application: Application) : AndroidViewModel(application
 
     private companion object {
         const val RELOCK_GRACE_MS = 30_000L
+        const val MAX_BACKUP_BYTES = 5 * 1024 * 1024
     }
 }

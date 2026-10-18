@@ -359,6 +359,12 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Backup & export Section
+            SettingsSectionHeader(title = "BACKUP & EXPORT")
+            BackupSection(viewModel)
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Privacy Guarantee Section
             SettingsSectionHeader(title = "PRIVACY & ZERO-CLOUD ARCHITECTURE")
 
@@ -521,6 +527,208 @@ private fun PrivacyBulletItem(icon: ImageVector, title: String, description: Str
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 16.sp
             )
+        }
+    }
+}
+
+private enum class BackupDialog { CREATE, RESTORE, CSV_WARNING }
+
+@Composable
+private fun BackupSection(viewModel: SubTrackViewModel) {
+    val result by viewModel.backupResult.collectAsState()
+    var dialog by remember { mutableStateOf<BackupDialog?>(null) }
+    var passphrase by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var restoreUri by remember { mutableStateOf<Uri?>(null) }
+
+    fun closeDialog() {
+        dialog = null
+        passphrase = ""
+        confirmation = ""
+    }
+
+    val stamp = remember { java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ENGLISH).format(java.util.Date()) }
+
+    val createLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        if (uri != null) viewModel.createBackup(uri, passphrase.toCharArray())
+        closeDialog()
+    }
+    val restoreLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            restoreUri = uri
+            dialog = BackupDialog.RESTORE
+        }
+    }
+    val csvLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) viewModel.exportCsv(uri)
+    }
+
+    val passwordKeyboard = androidx.compose.foundation.text.KeyboardOptions(
+        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password
+    )
+
+    when (dialog) {
+        BackupDialog.CREATE -> {
+            val tooShort = passphrase.length < com.example.backup.BackupCrypto.MIN_PASSPHRASE_LENGTH
+            val mismatch = passphrase != confirmation
+            AlertDialog(
+                onDismissRequest = { closeDialog() },
+                title = { Text("Create encrypted backup", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column {
+                        Text(
+                            "Choose a passphrase of at least ${com.example.backup.BackupCrypto.MIN_PASSPHRASE_LENGTH} characters. " +
+                                "SubTrack never stores it and cannot recover it: if you forget it, the backup cannot be opened.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = passphrase,
+                            onValueChange = { passphrase = it },
+                            label = { Text("Passphrase") },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = passwordKeyboard,
+                            modifier = Modifier.fillMaxWidth().testTag("backup_passphrase_field")
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = confirmation,
+                            onValueChange = { confirmation = it },
+                            label = { Text("Repeat passphrase") },
+                            singleLine = true,
+                            isError = confirmation.isNotEmpty() && mismatch,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = passwordKeyboard,
+                            modifier = Modifier.fillMaxWidth().testTag("backup_confirm_field")
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        enabled = !tooShort && !mismatch,
+                        onClick = { createLauncher.launch("subtrack-backup-$stamp.stbackup") },
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                        modifier = Modifier.testTag("backup_choose_location_button")
+                    ) { Text("Choose where to save") }
+                },
+                dismissButton = { TextButton(onClick = { closeDialog() }) { Text("Cancel") } }
+            )
+        }
+
+        BackupDialog.RESTORE -> {
+            AlertDialog(
+                onDismissRequest = { closeDialog() },
+                title = { Text("Restore backup", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column {
+                        Text(
+                            "Enter the passphrase you chose when creating this backup. Subscriptions you already track are kept; " +
+                                "only missing ones are added.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = passphrase,
+                            onValueChange = { passphrase = it },
+                            label = { Text("Passphrase") },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = passwordKeyboard,
+                            modifier = Modifier.fillMaxWidth().testTag("restore_passphrase_field")
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        enabled = passphrase.isNotEmpty() && restoreUri != null,
+                        onClick = {
+                            restoreUri?.let { viewModel.restoreBackup(it, passphrase.toCharArray()) }
+                            restoreUri = null
+                            closeDialog()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                        modifier = Modifier.testTag("restore_confirm_button")
+                    ) { Text("Restore") }
+                },
+                dismissButton = { TextButton(onClick = { restoreUri = null; closeDialog() }) { Text("Cancel") } }
+            )
+        }
+
+        BackupDialog.CSV_WARNING -> {
+            AlertDialog(
+                onDismissRequest = { closeDialog() },
+                title = { Text("Export is not encrypted", fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        "The CSV file lists every subscription in plain text. Anyone who gets the file can read it. " +
+                            "Use the encrypted backup if you only want to keep your data safe.",
+                        fontSize = 13.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            closeDialog()
+                            csvLauncher.launch("subtrack-subscriptions-$stamp.csv")
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                        modifier = Modifier.testTag("csv_export_anyway_button")
+                    ) { Text("Export anyway") }
+                },
+                dismissButton = { TextButton(onClick = { closeDialog() }) { Text("Cancel") } }
+            )
+        }
+
+        null -> Unit
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Your data stays on this phone and isn't backed up by Google. Make an encrypted backup to move to a new phone or recover after a reset.",
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { dialog = BackupDialog.CREATE },
+                colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                modifier = Modifier.fillMaxWidth().testTag("create_backup_button")
+            ) { Text("Create encrypted backup") }
+            Spacer(modifier = Modifier.height(8.dp))
+            androidx.compose.material3.OutlinedButton(
+                onClick = { restoreLauncher.launch(arrayOf("*/*")) },
+                modifier = Modifier.fillMaxWidth().testTag("restore_backup_button")
+            ) { Text("Restore from backup") }
+            Spacer(modifier = Modifier.height(8.dp))
+            androidx.compose.material3.OutlinedButton(
+                onClick = { dialog = BackupDialog.CSV_WARNING },
+                modifier = Modifier.fillMaxWidth().testTag("export_csv_button")
+            ) { Text("Export as CSV (not encrypted)") }
+
+            result?.let { r ->
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = r.message,
+                    fontSize = 12.sp,
+                    color = if (r.isError) MaterialTheme.colorScheme.error else BrandPrimary,
+                    modifier = Modifier.testTag("backup_result_text")
+                )
+            }
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.example.data.repository
 
+import com.example.backup.BackupMerge
+import com.example.backup.RestorePlan
 import com.example.data.local.SubscriptionDao
 import com.example.data.local.SubscriptionEntity
 import com.example.insights.ImportDiff
@@ -15,6 +17,15 @@ class SubscriptionRepository(private val dao: SubscriptionDao) {
     fun getSubscriptionByIdFlow(id: Long): Flow<SubscriptionEntity?> = dao.getSubscriptionByIdFlow(id)
 
     suspend fun getSubscriptionById(id: Long): SubscriptionEntity? = dao.getSubscriptionById(id)
+
+    suspend fun getAllOnce(): List<SubscriptionEntity> = dao.getAllOnce()
+
+    /** Adds what a backup has that is not already tracked; never overwrites or deletes anything. */
+    suspend fun restoreMerging(incoming: List<SubscriptionEntity>): RestorePlan {
+        val plan = BackupMerge.plan(dao.getAllOnce(), incoming)
+        if (plan.toInsert.isNotEmpty()) dao.insertAll(plan.toInsert)
+        return plan
+    }
 
     suspend fun insertSubscription(entity: SubscriptionEntity): Long = dao.insertSubscription(entity)
 

@@ -73,4 +73,4 @@ If this policy changes in a way that affects you, the app will show you the new 
 
 ## Contact and grievance
 
-Akshith Rao B · REPLACE_WITH_PRIVACY_EMAIL
+Akshith Rao B · akshithraobompelli@gmail.com

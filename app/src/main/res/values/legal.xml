@@ -3,7 +3,7 @@
     <!-- Single source for the values filled into assets/privacy_policy.md.
          The release build refuses to proceed while the email is still the placeholder. -->
     <string name="publisher_name" translatable="false">Akshith Rao B</string>
-    <string name="privacy_contact_email" translatable="false">REPLACE_WITH_PRIVACY_EMAIL</string>
+    <string name="privacy_contact_email" translatable="false">akshithraobompelli@gmail.com</string>
     <string name="policy_effective_date" translatable="false">18 October 2026</string>
     <!-- Bump when the policy changes in a way that needs fresh consent -->
     <integer name="policy_version">1</integer>

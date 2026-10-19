@@ -107,7 +107,103 @@ class DefaultStatementParser : StatementParser {
             }
         }
 
+        // Statements that spread one transaction over several lines (date and narration first, the
+        // amounts a line or two later) defeat the line-by-line pass: read them as records instead
+        val dated = source.count { l -> datePattern.find(l.trim())?.let { it.range.first <= 3 } == true }
+        if (dated >= 3 && result.size < dated / 2) {
+            val records = parseRecordLayout(source)
+            if (records.size > result.size) return records
+        }
+
         return result
+    }
+
+    private val refTokenPattern = Regex("""\b(?:[A-Z]{2,8}[0-9]{6,}[A-Z0-9]*|[0-9]{6,})\b""")
+
+    /**
+     * Record-based reading for any statement where a transaction starts at a line that begins with its
+     * date and runs until the next such line. The amounts are taken from the last line of the record
+     * that has any; debit or credit comes from a Dr/Cr marker, the running balance, or the wording.
+     * Page headers and footers are removed, and so are lines that repeat across the document without
+     * digits (category labels, bank name), so they do not end up in the merchant name.
+     */
+    private fun parseRecordLayout(lines: List<String>): List<RawTransactionLine> {
+        val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
+        val begin = clean.indexOfFirst { looksLikeHeaderText(it) }.let { if (it < 0) 0 else it }
+        val body = clean.drop(begin)
+        val repeated = body.groupingBy { it }.eachCount().filter { (line, n) -> n >= 3 && line.none { it.isDigit() } }.keys
+
+        class Record(val date: MatchResult, val parts: MutableList<String>)
+        val records = mutableListOf<Record>()
+        var prevBalance: Double? = null
+        for (line in body) {
+            if (looksLikeHeaderText(line) || skipLinePattern.containsMatchIn(line)) continue
+            if (balanceRowPattern.containsMatchIn(line)) {
+                if (openingPattern.containsMatchIn(line) && records.isEmpty()) {
+                    prevBalance = amountPattern.findAll(line).lastOrNull()?.let { amountOf(it) } ?: prevBalance
+                }
+                continue
+            }
+            val date = datePattern.find(line)?.takeIf { it.range.first <= 3 }
+            val isPeriodLine = date != null && datePattern.findAll(line).count() >= 2 && amountPattern.find(line) == null
+            if (date != null && !isPeriodLine) {
+                records.add(Record(date, mutableListOf(line.substring(date.range.last + 1).trim())))
+            } else if (records.isNotEmpty()) {
+                records.last().parts.add(line)
+            }
+        }
+
+        val out = mutableListOf<RawTransactionLine>()
+        for (rec in records) {
+            val amountIdx = rec.parts.indexOfLast { amountPattern.find(it) != null }
+            if (amountIdx < 0) continue
+            val epochMs = parseDateStrToMillis(rec.date.value)
+            if (epochMs == 0L) continue
+            val amountLine = rec.parts[amountIdx]
+            val amounts = amountPattern.findAll(amountLine).toList()
+            val balance = if (amounts.size >= 2) amountOf(amounts.last()) else null
+            var direction: Direction? = null
+            val chosen = when {
+                amounts.size >= 3 -> {
+                    val d = amountOf(amounts[amounts.size - 3])
+                    val c = amountOf(amounts[amounts.size - 2])
+                    when {
+                        d > 0.0 && c == 0.0 -> { direction = Direction.DEBIT; amounts[amounts.size - 3] }
+                        c > 0.0 && d == 0.0 -> { direction = Direction.CREDIT; amounts[amounts.size - 2] }
+                        else -> amounts[amounts.size - 2]
+                    }
+                }
+                else -> amounts[0]
+            }
+            val amount = amountOf(chosen)
+            if (amount <= 0.0) continue
+
+            // Anything after the amount line is page furniture (footer, next page header), not narration
+            val text = rec.parts.take(amountIdx + 1).mapIndexedNotNull { i, raw ->
+                if (i > 0 && raw in repeated) return@mapIndexedNotNull null
+                var t = raw
+                if (i == amountIdx) {
+                    val sb = StringBuilder(t)
+                    amounts.sortedByDescending { it.range.first }.forEach { sb.replace(it.range.first, it.range.last + 1, " ") }
+                    t = sb.toString()
+                }
+                t.replace(refTokenPattern, " ").replace(Regex("""\s+"""), " ").trim().ifBlank { null }
+            }.joinToString(" ").ifBlank { "Bank Transaction" }
+
+            val finalDirection = direction ?: resolveDirection(amount, balance, prevBalance, chosen.groups[3]?.value, text, null)
+            out.add(
+                RawTransactionLine(
+                    date = rec.date.value,
+                    description = text,
+                    debitAmount = if (finalDirection == Direction.DEBIT) amount else 0.0,
+                    creditAmount = if (finalDirection == Direction.CREDIT) amount else 0.0,
+                    isDebit = finalDirection == Direction.DEBIT,
+                    dateEpochMs = epochMs
+                )
+            )
+            prevBalance = balance ?: prevBalance
+        }
+        return out
     }
 
     private val dateOnlyPattern = Regex("""^\d{1,2}\s+[A-Za-z]{3,9}\.?\s+(?:20)?\d{2}$""")

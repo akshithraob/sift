@@ -22,6 +22,38 @@ class DefaultRecurringDetector : RecurringDetector {
 
     private companion object {
         const val MIN_SUBSCRIPTION_AMOUNT = 10.0
+        const val MAX_CYCLE_SPREAD_DAYS = 5.0
+        const val MAX_BILL_SWING = 2.5
+    }
+
+    /** Gaps between payments of a steady bill vary by a few days (weekends, due dates), not more. */
+    private fun intervalSpread(days: List<Long>): Double {
+        if (days.size < 2) return 0.0
+        val mean = days.average()
+        return Math.sqrt(days.sumOf { (it - mean) * (it - mean) } / days.size)
+    }
+
+    /**
+     * Among a merchant's debits, the largest group of amounts within ±10% of each other that repeat on a
+     * regular cycle (or number three or more). Null when the whole group already agrees or none does.
+     */
+    private fun repeatingSubset(group: List<RawTransactionLine>): List<RawTransactionLine>? {
+        if (group.size < 3) return null
+        val amounts = group.map { it.debitAmount }
+        if ((amounts.max() - amounts.min()) / amounts.max() <= 0.10) return null
+        var best: List<RawTransactionLine>? = null
+        for (anchor in amounts.distinct()) {
+            val subset = group.filter { abs(it.debitAmount - anchor) <= anchor * 0.10 }.sortedBy { it.dateEpochMs }
+            if (subset.size < 2 || subset.size == group.size) continue
+            val gaps = subset.zipWithNext { a, b -> (b.dateEpochMs - a.dateEpochMs) / (24L * 3600 * 1000) }.filter { it > 0 }
+            val avg = if (gaps.isEmpty()) 0.0 else gaps.average()
+            val regular = avg in 5.0..9.0 || avg in 24.0..36.0 || avg in 75.0..105.0 || avg in 340.0..390.0
+            // Picking a few debits out of a noisy merchant needs strong evidence: three or more, or identical amounts on a cycle
+            val identical = subset.map { it.debitAmount }.distinct().size == 1
+            if (!(subset.size >= 3 || (identical && regular))) continue
+            if (best == null || subset.size > best.size) best = subset
+        }
+        return best
     }
 
     private val knownSubscriptions = setOf("Netflix", "Spotify Premium", "Disney+ Hotstar", "Tata Play", "Cult.fit")
@@ -37,8 +69,15 @@ class DefaultRecurringDetector : RecurringDetector {
         // Group by normalized merchant name
         val grouped = debits.groupBy { normalizeMerchantName(it.description) }
 
-        for ((normalizedMerchant, txGroup) in grouped) {
+        for ((normalizedMerchant, fullGroup) in grouped) {
+            // One merchant can mix a subscription with ordinary purchases (a Prime fee among shopping);
+            // when the amounts do not agree, look for the subset that does
+            val txGroup = repeatingSubset(fullGroup) ?: fullGroup
             if (normalizedMerchant.isBlank() || normalizedMerchant.length < 2) continue
+            // Cash withdrawals repeat but are not payments to a subscription
+            if (Regex("""(?i)\b(atm|cash withdrawal|cash wdl)\b""").containsMatchIn(normalizedMerchant) &&
+                fullGroup.none { tx -> mandateKeywords.any { tx.description.contains(it, ignoreCase = true) } }
+            ) continue
 
             val hasMandatePrefix = txGroup.any { tx ->
                 mandateKeywords.any { keyword -> tx.description.contains(keyword, ignoreCase = true) }
@@ -87,9 +126,15 @@ class DefaultRecurringDetector : RecurringDetector {
                 // Two similar debits that are not a week/month/quarter/year apart are just repeat purchases
                 val similarOnCycle = isAmountSimilar && (isRegularInterval || txGroup.size >= 3)
 
-                if (similarOnCycle || hasMandatePrefix || knownSubscriptionOnCycle) {
+                // Bills (electricity, broadband, postpaid) repeat on a steady cycle but the amount changes
+                val steadyCycle = txGroup.size >= 3 && isRegularInterval && intervalSpread(intervalsDays) <= MAX_CYCLE_SPREAD_DAYS &&
+                    maxAmt <= minAmt * MAX_BILL_SWING
+                val variableBill = steadyCycle && !(similarOnCycle || hasMandatePrefix || knownSubscriptionOnCycle)
+
+                if (similarOnCycle || hasMandatePrefix || knownSubscriptionOnCycle || variableBill) {
                     val avgAmount = Math.round(amounts.average() * 100.0) / 100.0
                     val confidence = when {
+                        variableBill -> Confidence.MEDIUM
                         hasMandatePrefix && isAmountSimilar -> Confidence.HIGH
                         isAmountSimilar && isRegularInterval -> Confidence.HIGH
                         hasMandatePrefix -> Confidence.HIGH
@@ -111,6 +156,7 @@ class DefaultRecurringDetector : RecurringDetector {
 
                     val reason = buildString {
                         if (hasMandatePrefix) append("Narration matches Autopay/Mandate pattern. ")
+                        if (variableBill) append("${txGroup.size} payments on a steady cycle, with changing amounts (like a bill). ")
                         if (isAmountSimilar) append("${txGroup.size} debits with similar amounts (±10% variance). ")
                         if (isRegularInterval) append("Debited on a regular ${detectedFrequency.displayName.lowercase()} cycle (~${avgInterval.toInt()} days). ")
                     }.trim()
@@ -168,11 +214,13 @@ class DefaultRecurringDetector : RecurringDetector {
     override fun normalizeMerchantName(rawNarration: String): String {
         var clean = rawNarration.uppercase().trim()
 
+        clean = clean.replace(Regex("\\([^)]*\\)"), " ")
+
         // 1. Strip UPI IDs (e.g. swiggy@icici, spotify@paytm, user@okaxis)
         clean = clean.replace(Regex("[a-zA-Z0-9._]+@[a-zA-Z0-9.]+"), " ")
 
         // 2. Strip standard Indian bank transfer prefixes
-        clean = clean.replace(Regex("^(TO\\s+|FROM\\s+|TRANSFER TO\\s+[0-9]+/UPI/|UPI/CR/[0-9]+/|UPI-MANDATE-|UPI-AUTOPAY-|UPI/|UPI-|ACH D-|ACH-|ACH/|NACH-|NACH/|IB SI-|SI-|SI/|POS\\s+[0-9]+|POS/|POS-|NEFT-|RTGS-|IMPS-|BY TRANSFER-)"), " ")
+        clean = clean.replace(Regex("^((?:UPI|POS|AUTOPAY|AUTO PAY|ATM|ACH|NACH|SI|NEFT|RTGS|IMPS|ECS|EMI)\\s+[-/]\\s+|TO\\s+|FROM\\s+|TRANSFER TO\\s+[0-9]+/UPI/|UPI/CR/[0-9]+/|UPI-MANDATE-|UPI-AUTOPAY-|UPI/|UPI-|ACH D-|ACH-|ACH/|NACH-|NACH/|IB SI-|SI-|SI/|POS\\s+[0-9]+|POS/|POS-|NEFT-|RTGS-|IMPS-|BY TRANSFER-)"), " ")
 
         // 3. Strip alphanumeric reference codes / IFSC / Bank codes (e.g. HDFC000123, UTIR0000123, MND98124)
         clean = clean.replace(Regex("\\b[A-Z]{4}0[A-Z0-9]{6}\\b"), " ")

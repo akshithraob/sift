@@ -74,6 +74,7 @@ fun SettingsScreen(
     viewModel: LeakproofViewModel,
     onNavigateBack: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
+    onOpenTrustCenter: () -> Unit,
     onDataWiped: () -> Unit
 ) {
     val context = LocalContext.current
@@ -413,6 +414,11 @@ fun SettingsScreen(
                         onClick = onOpenPrivacyPolicy,
                         modifier = Modifier.fillMaxWidth().testTag("open_privacy_policy_button")
                     ) { Text("Read the privacy policy") }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onOpenTrustCenter,
+                        modifier = Modifier.fillMaxWidth().testTag("open_trust_center_button")
+                    ) { Text("Open the Trust Center") }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "To withdraw consent, use \"Delete all my data & withdraw consent\" under Danger zone below.",

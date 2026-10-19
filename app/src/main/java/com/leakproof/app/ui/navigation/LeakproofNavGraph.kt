@@ -19,6 +19,7 @@ import com.leakproof.app.ui.screens.OnboardingScreen
 import com.leakproof.app.ui.screens.ReviewScreen
 import com.leakproof.app.ui.screens.SettingsScreen
 import com.leakproof.app.ui.screens.SubscriptionDetailScreen
+import com.leakproof.app.ui.screens.TrustCenterScreen
 import com.leakproof.app.ui.viewmodel.LeakproofViewModel
 
 object Destinations {
@@ -34,6 +35,7 @@ object Destinations {
     const val MANUAL_EDIT = "manual_edit/{id}"
     const val SETTINGS = "settings"
     const val CALENDAR = "calendar"
+    const val TRUST = "trust"
 
     fun detail(id: Long) = "detail/$id"
     fun edit(id: Long) = "manual_edit/$id"
@@ -179,11 +181,16 @@ fun LeakproofNavGraph(
             )
         }
 
+        composable(Destinations.TRUST) {
+            TrustCenterScreen(viewModel = viewModel, onNavigateBack = { navController.popBackStack() })
+        }
+
         composable(Destinations.SETTINGS) {
             SettingsScreen(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onOpenPrivacyPolicy = { navController.navigate(Destinations.PRIVACY_POLICY) },
+                onOpenTrustCenter = { navController.navigate(Destinations.TRUST) },
                 onDataWiped = { com.leakproof.app.util.restartApp(appContext) }
             )
         }

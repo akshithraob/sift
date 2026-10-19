@@ -133,7 +133,7 @@ fun ForecastCard(months: List<MonthForecast>, modifier: Modifier = Modifier) {
                         val segment = (amount / month.total).toFloat() * fullHeight
                         if (segment > 0f) {
                             drawRoundRect(
-                                color = kindFill(kind).copy(alpha = if (isChosen) 1f else 0.55f),
+                                color = kindFill(kind).copy(alpha = if (isChosen) 1f else 0.78f),
                                 topLeft = Offset(x, yCursor - segment),
                                 size = Size(barWidth, segment),
                                 cornerRadius = CornerRadius(4.dp.toPx())

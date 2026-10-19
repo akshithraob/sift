@@ -1,6 +1,14 @@
 package com.leakproof.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,23 +26,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PublicOff
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,278 +43,251 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.leakproof.app.ui.components.AppCard
+import com.leakproof.app.ui.components.BrandMark
+import com.leakproof.app.ui.components.rememberHaptics
 import com.leakproof.app.ui.theme.BrandPrimary
 import kotlinx.coroutines.launch
+
+private data class OnboardingPage(val title: String, val tagline: String, val description: String)
+
+private val pages = listOf(
+    OnboardingPage(
+        "Zero cloud.\nEverything on-device.",
+        "Private by design",
+        "Leakproof has no network permission. No servers, no tracking, no external APIs. Your statements and screenshots never leave this phone."
+    ),
+    OnboardingPage(
+        "An encrypted vault",
+        "Locked on your phone",
+        "Your records are encrypted with SQLCipher AES-256, and the key is protected by the Android Keystore."
+    ),
+    OnboardingPage(
+        "Find every leak",
+        "UPI, e-NACH, standing instructions, EMIs",
+        "Import a Google Pay, PhonePe or Paytm Autopay screenshot, or a bank statement. Leakproof reads it on your phone and finds what you pay."
+    )
+)
 
 @Composable
 fun OnboardingScreen(
     onComplete: (enableAppLock: Boolean) -> Unit
 ) {
-    val pagerState = rememberPagerState(pageCount = { 3 })
-    val coroutineScope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { pages.size })
+    val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
     var enableAppLock by remember { mutableStateOf(true) }
+    val last = pagerState.currentPage == pages.lastIndex
 
-    val pages = listOf(
-        OnboardingPageData(
-            icon = Icons.Default.PublicOff,
-            title = "Zero Cloud. 100% On-Device.",
-            tagline = "Non-Negotiable Privacy",
-            description = "Leakproof has NO INTERNET permission. No servers, no tracking, and no external APIs. Your bank statements and UPI screenshots never leave this device."
-        ),
-        OnboardingPageData(
-            icon = Icons.Default.Shield,
-            title = "Encrypted Vault",
-            tagline = "Encrypted on your phone",
-            description = "Your mandate records are encrypted with SQLCipher AES-256, and the key is protected by the Android Keystore."
-        ),
-        OnboardingPageData(
-            icon = Icons.Default.VpnKey,
-            title = "Smart Mandate Radar",
-            tagline = "UPI, NACH & Standing Instructions",
-            description = "Instantly detect recurring payments from Google Pay, PhonePe, Paytm screenshots or PDF bank statements with on-device text parsing."
-        )
-    )
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(padding)
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Badge
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = BrandPrimary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "OFFLINE VAULT",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = BrandPrimary,
-                    letterSpacing = 1.sp
-                )
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                BrandMark(modifier = Modifier.weight(1f))
+                if (!last) {
+                    TextButton(
+                        onClick = { scope.launch { pagerState.animateScrollToPage(pages.lastIndex) } },
+                        modifier = Modifier.testTag("onboarding_skip")
+                    ) { Text("Skip", fontWeight = FontWeight.SemiBold) }
+                }
             }
 
-            // Pager
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) { page ->
-                val item = pages[page]
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            ) { index ->
+                val page = pages[index]
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 8.dp),
+                    modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                            .background(BrandPrimary.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = null,
-                            tint = BrandPrimary,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
+                    Illustration(index)
+                    Spacer(modifier = Modifier.height(30.dp))
                     Text(
-                        text = item.tagline.uppercase(),
-                        color = BrandPrimary,
-                        fontSize = 12.sp,
+                        page.tagline.uppercase(),
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp
+                        letterSpacing = 1.2.sp,
+                        color = MaterialTheme.colorScheme.primary
                     )
-
                     Spacer(modifier = Modifier.height(8.dp))
-
                     Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
+                        page.title,
+                        style = MaterialTheme.typography.headlineLarge,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = item.description,
+                        page.description,
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 22.sp
+                        modifier = Modifier.padding(horizontal = 8.dp)
                     )
                 }
             }
 
-            // Bottom Section
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Page Indicator Dots
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(bottom = 20.dp)
-                ) {
-                    repeat(3) { index ->
-                        val isSelected = pagerState.currentPage == index
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .height(8.dp)
-                                .width(if (isSelected) 24.dp else 8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(
-                                    if (isSelected) BrandPrimary else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                        )
-                    }
+            // Page dots
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                pages.indices.forEach { i ->
+                    val selected = i == pagerState.currentPage
+                    val width by animateDpAsState(if (selected) 26.dp else 8.dp, tween(250), label = "dot")
+                    val color by animateColorAsState(
+                        if (selected) BrandPrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), tween(250), label = "dotColor"
+                    )
+                    Box(modifier = Modifier.height(8.dp).width(width).clip(CircleShape).background(color))
                 }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
 
-                // If on last page, show App Lock setup
-                AnimatedVisibility(visible = pagerState.currentPage == 2) {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        border = com.leakproof.app.ui.components.appCardBorder(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Fingerprint,
-                                    contentDescription = null,
-                                    tint = BrandPrimary,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Biometric & PIN Lock",
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 15.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Require authentication to open vault",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = enableAppLock,
-                                onCheckedChange = { enableAppLock = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = BrandPrimary,
-                                    checkedTrackColor = BrandPrimary.copy(alpha = 0.4f)
-                                ),
-                                modifier = Modifier.testTag("app_lock_switch")
-                            )
-                        }
-                    }
-                }
-
-                // Action Buttons
-                if (pagerState.currentPage < 2) {
+            if (last) {
+                AppCard {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(2)
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Skip")
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Lock with fingerprint or screen lock", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Recommended. Asked each time you open the app.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-
-                        Button(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.testTag("next_button")
-                        ) {
-                            Text("Continue", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                } else {
-                    Button(
-                        onClick = { onComplete(enableAppLock) },
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .testTag("get_started_button")
-                    ) {
-                        Text(
-                            text = "Enter Encrypted Vault",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                        Switch(
+                            checked = enableAppLock,
+                            onCheckedChange = { enableAppLock = it; haptics.toggle() },
+                            colors = SwitchDefaults.colors(checkedTrackColor = BrandPrimary),
+                            modifier = Modifier.testTag("app_lock_switch")
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(14.dp))
+                Button(
+                    onClick = { haptics.confirm(); onComplete(enableAppLock) },
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp).testTag("onboarding_finish")
+                ) { Text("Get started", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp) }
+            } else {
+                Button(
+                    onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp).testTag("onboarding_continue")
+                ) { Text("Continue", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp) }
             }
         }
     }
 }
 
-private data class OnboardingPageData(
-    val icon: ImageVector,
-    val title: String,
-    val tagline: String,
-    val description: String
-)
+/** Three small drawings, one per page, in the app's own colours. */
+@Composable
+private fun Illustration(page: Int) {
+    val primary = BrandPrimary
+    val ink = MaterialTheme.colorScheme.onBackground
+    val soft = MaterialTheme.colorScheme.surfaceContainerHigh
+    val transition = rememberInfiniteTransition(label = "illustration")
+    val angle by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "angle")
+    val pulse by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "pulse")
+
+    Canvas(modifier = Modifier.size(220.dp)) {
+        val c = center
+        drawCircle(Brush.radialGradient(listOf(primary.copy(alpha = 0.22f), Color.Transparent), center = c, radius = size.minDimension / 2f))
+        when (page) {
+            0 -> drawPhoneWithoutCloud(c, ink, soft, primary, pulse)
+            1 -> drawVault(c, ink, soft, primary, pulse)
+            else -> drawRadar(c, soft, primary, angle)
+        }
+    }
+}
+
+private fun DrawScope.drawPhoneWithoutCloud(c: Offset, ink: Color, soft: Color, primary: Color, pulse: Float) {
+    val w = 84.dp.toPx()
+    val h = 150.dp.toPx()
+    drawRoundRect(soft, Offset(c.x - w / 2, c.y - h / 2), Size(w, h), CornerRadius(18.dp.toPx()))
+    drawRoundRect(ink.copy(alpha = 0.8f), Offset(c.x - w / 2, c.y - h / 2), Size(w, h), CornerRadius(18.dp.toPx()), style = Stroke(3.dp.toPx()))
+    drawRoundRect(ink.copy(alpha = 0.5f), Offset(c.x - 14.dp.toPx(), c.y - h / 2 + 8.dp.toPx()), Size(28.dp.toPx(), 4.dp.toPx()), CornerRadius(2.dp.toPx()))
+    // The drop sits safely inside the phone
+    val dropScale = 1f + 0.05f * pulse
+    drawDrop(Offset(c.x, c.y + 4.dp.toPx()), 20.dp.toPx() * dropScale, primary)
+    // A cloud, crossed out
+    val cloud = Offset(c.x + w / 2 + 18.dp.toPx(), c.y - h / 2 + 18.dp.toPx())
+    drawCircle(ink.copy(alpha = 0.25f), 11.dp.toPx(), cloud)
+    drawCircle(ink.copy(alpha = 0.25f), 8.dp.toPx(), cloud + Offset(-14.dp.toPx(), 4.dp.toPx()))
+    drawCircle(ink.copy(alpha = 0.25f), 8.dp.toPx(), cloud + Offset(14.dp.toPx(), 4.dp.toPx()))
+    drawLine(Color(0xFFF0554D), cloud + Offset(-24.dp.toPx(), 18.dp.toPx()), cloud + Offset(24.dp.toPx(), -14.dp.toPx()), 4.dp.toPx(), StrokeCap.Round)
+}
+
+private fun DrawScope.drawVault(c: Offset, ink: Color, soft: Color, primary: Color, pulse: Float) {
+    val w = 120.dp.toPx()
+    val h = 132.dp.toPx()
+    val top = c.y - h / 2 + 12.dp.toPx()
+    // Shackle
+    drawArc(ink.copy(alpha = 0.8f), 180f, 180f, false, Offset(c.x - 34.dp.toPx(), top - 44.dp.toPx()), Size(68.dp.toPx(), 80.dp.toPx()), style = Stroke(9.dp.toPx(), cap = StrokeCap.Round))
+    // Body
+    drawRoundRect(primary, Offset(c.x - w / 2, top + 10.dp.toPx()), Size(w, h - 22.dp.toPx()), CornerRadius(22.dp.toPx()))
+    drawRoundRect(Color.White.copy(alpha = 0.18f + 0.1f * pulse), Offset(c.x - w / 2 + 8.dp.toPx(), top + 18.dp.toPx()), Size(w - 16.dp.toPx(), 18.dp.toPx()), CornerRadius(9.dp.toPx()))
+    // Keyhole
+    val kh = Offset(c.x, top + h / 2 + 8.dp.toPx())
+    drawCircle(Color.White, 11.dp.toPx(), kh)
+    val stem = Path().apply {
+        moveTo(kh.x - 5.dp.toPx(), kh.y + 4.dp.toPx()); lineTo(kh.x + 5.dp.toPx(), kh.y + 4.dp.toPx())
+        lineTo(kh.x + 8.dp.toPx(), kh.y + 30.dp.toPx()); lineTo(kh.x - 8.dp.toPx(), kh.y + 30.dp.toPx()); close()
+    }
+    drawPath(stem, Color.White)
+    drawCircle(soft, 0f, c)
+}
+
+private fun DrawScope.drawRadar(c: Offset, soft: Color, primary: Color, angle: Float) {
+    val r = 90.dp.toPx()
+    for (i in 1..3) drawCircle(primary.copy(alpha = 0.22f), r * i / 3f, c, style = Stroke(1.5.dp.toPx()))
+    drawLine(primary.copy(alpha = 0.18f), Offset(c.x - r, c.y), Offset(c.x + r, c.y), 1.dp.toPx())
+    drawLine(primary.copy(alpha = 0.18f), Offset(c.x, c.y - r), Offset(c.x, c.y + r), 1.dp.toPx())
+    // The sweeping beam
+    rotate(angle, c) {
+        drawArc(
+            brush = Brush.sweepGradient(listOf(Color.Transparent, primary.copy(alpha = 0.55f)), center = c),
+            startAngle = -60f, sweepAngle = 60f, useCenter = true,
+            topLeft = Offset(c.x - r, c.y - r), size = Size(r * 2, r * 2)
+        )
+        drawLine(primary, c, Offset(c.x + r, c.y), 3.dp.toPx(), StrokeCap.Round)
+    }
+    // Things the radar found
+    listOf(Offset(0.45f, -0.5f), Offset(-0.55f, 0.2f), Offset(0.2f, 0.62f), Offset(-0.2f, -0.65f)).forEach { p ->
+        drawCircle(Color(0xFFF5A524), 6.dp.toPx(), Offset(c.x + p.x * r, c.y + p.y * r))
+    }
+    drawDrop(c, 15.dp.toPx(), primary)
+    drawCircle(soft, 0f, c)
+}
+
+private fun DrawScope.drawDrop(center: Offset, size: Float, color: Color) {
+    val path = Path().apply {
+        moveTo(center.x, center.y - size * 1.1f)
+        cubicTo(center.x, center.y - size * 1.1f, center.x - size, center.y - size * 0.15f, center.x - size, center.y + size * 0.3f)
+        cubicTo(center.x - size, center.y + size * 0.85f, center.x - size * 0.55f, center.y + size * 1.1f, center.x, center.y + size * 1.1f)
+        cubicTo(center.x + size * 0.55f, center.y + size * 1.1f, center.x + size, center.y + size * 0.85f, center.x + size, center.y + size * 0.3f)
+        cubicTo(center.x + size, center.y - size * 0.15f, center.x, center.y - size * 1.1f, center.x, center.y - size * 1.1f)
+        close()
+    }
+    drawPath(path, color)
+}

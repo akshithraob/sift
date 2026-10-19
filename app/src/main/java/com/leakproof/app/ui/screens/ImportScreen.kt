@@ -174,6 +174,7 @@ fun ImportScreen(
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -206,32 +207,6 @@ fun ImportScreen(
                     fontSize = 13.sp,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).testTag("import_error")
                 )
-            }
-
-            if (isProcessingOcr) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = BrandPrimary.copy(alpha = 0.2f),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = BrandPrimary,
-                            strokeWidth = 2.5.dp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Processing screenshots with on-device ML Kit...",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
             }
 
             // Privacy Assurance Card
@@ -364,6 +339,8 @@ fun ImportScreen(
 
             Spacer(modifier = Modifier.height(30.dp))
         }
+    }
+    if (isProcessingOcr) com.leakproof.app.ui.components.ScanOverlay()
     }
 }
 

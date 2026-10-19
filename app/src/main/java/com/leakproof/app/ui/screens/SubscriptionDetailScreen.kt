@@ -215,10 +215,9 @@ fun SubscriptionDetailScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            text = CurrencyFormatter.format(subscription.amount),
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 28.sp,
+                        com.leakproof.app.ui.components.AnimatedAmount(
+                            amount = subscription.amount,
+                            style = MaterialTheme.typography.displaySmall,
                             color = BrandPrimary
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -303,6 +302,11 @@ fun SubscriptionDetailScreen(
 
             if (subscription.kind == "EMI") {
                 com.leakproof.app.ui.components.EmiProgressCard(subscription)
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            if (subscription.status == "ACTIVE") {
+                com.leakproof.app.ui.components.UpcomingPaymentsCard(subscription)
                 Spacer(modifier = Modifier.height(24.dp))
             }
 

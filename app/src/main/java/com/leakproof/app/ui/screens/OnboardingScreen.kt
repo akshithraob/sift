@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -210,13 +211,17 @@ private fun Illustration(page: Int) {
     val angle by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "angle")
     val pulse by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "pulse")
 
-    Canvas(modifier = Modifier.size(220.dp)) {
+    // The last page also holds the app-lock card, so its drawing is drawn smaller to leave room
+    val factor = if (page == 2) 0.62f else 1f
+    Canvas(modifier = Modifier.size(220.dp * factor)) {
         val c = center
-        drawCircle(Brush.radialGradient(listOf(primary.copy(alpha = 0.22f), Color.Transparent), center = c, radius = size.minDimension / 2f))
-        when (page) {
-            0 -> drawPhoneWithoutCloud(c, ink, soft, primary, pulse)
-            1 -> drawVault(c, ink, soft, primary, pulse)
-            else -> drawRadar(c, soft, primary, angle)
+        scale(factor, c) {
+            drawCircle(Brush.radialGradient(listOf(primary.copy(alpha = 0.22f), Color.Transparent), center = c, radius = 110.dp.toPx()))
+            when (page) {
+                0 -> drawPhoneWithoutCloud(c, ink, soft, primary, pulse)
+                1 -> drawVault(c, ink, soft, primary, pulse)
+                else -> drawRadar(c, soft, primary, angle)
+            }
         }
     }
 }

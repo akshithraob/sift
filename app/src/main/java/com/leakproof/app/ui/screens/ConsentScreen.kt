@@ -142,14 +142,14 @@ fun ConsentScreen(
                         .height(50.dp)
                         .testTag("consent_decline_button")
                 ) {
-                    Text("No thanks")
+                    Text("No thanks", maxLines = 1, softWrap = false)
                 }
                 Button(
                     onClick = onAgree,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                     modifier = Modifier
-                        .weight(1.6f)
+                        .weight(1.3f)
                         .height(50.dp)
                         .testTag("consent_agree_button")
                 ) {

@@ -56,6 +56,60 @@ class DefaultRecurringDetector : RecurringDetector {
         return best
     }
 
+    /** Categories a statement prints for ordinary spending: repeats here are habits, not subscriptions. */
+    private val spendingCategories = setOf(
+        "groceries", "grocery", "shopping", "dining", "dining out", "food delivery", "food", "transport", "transfers",
+        "transfer", "cash", "travel", "fuel", "p2p", "entertainment", "restaurants", "restaurants & cafes"
+    )
+
+    /** Words that name a statement column (category or mode), not the merchant; trimmed off the end of a name. */
+    private val columnWords = setOf(
+        "subscriptions", "subscription", "groceries", "shopping", "dining", "food", "delivery", "transport", "transfers",
+        "rent", "cash", "savings", "health", "utilities", "insurance", "loan", "emi", "investments", "education",
+        "entertainment", "travel", "salary", "income", "refund", "card", "tuition", "consulting", "fuel",
+        "neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach", "rtgs", "debit", "credit", "dr", "cr"
+    )
+
+    private val fillerWords = setOf("premium", "subscription", "com", "app", "standard", "plus", "mobile", "family", "pro", "prime", "one", "gold", "membership", "recharge")
+
+    private val ambiguousBrands = setOf("JIO", "AIRTEL", "APPLE", "AMAZON", "TATA PLAY", "TATAPLAY")
+
+    private val modeWords = setOf("neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach", "rtgs", "dr", "cr")
+
+    /**
+     * Some statements print a category after an UPPER-CASE narration ("HOME LOAN EMI Loan EMI ACH"). When
+     * every word after the all-caps part is a known column word, drop them.
+     */
+    private fun cutCategorySuffix(raw: String): String {
+        val tokens = raw.trim().split(Regex("\\s+"))
+        fun hasLower(t: String) = t.any { it.isLowerCase() }
+        val firstLower = tokens.indexOfFirst { hasLower(it) }
+        if (firstLower <= 0 || tokens.take(firstLower).any { hasLower(it) }) return raw
+        val tail = tokens.drop(firstLower)
+        return if (tail.all { it.lowercase().trim('·', '•') in columnWords }) tokens.take(firstLower).joinToString(" ") else raw
+    }
+
+    private fun categoryOf(tx: RawTransactionLine): String? {
+        tx.category?.let { return it.lowercase() }
+        // Inline category: the last words of the narration (after the reference was removed)
+        val tokens = tx.description.lowercase().split(Regex("[^a-z&]+")).filter { it.isNotEmpty() }
+        for (n in 2 downTo 1) {
+            if (tokens.size >= n) {
+                val phrase = tokens.takeLast(n).joinToString(" ")
+                if (phrase in spendingCategories) return phrase
+            }
+        }
+        // "SI" / "ACH" style mode words can follow the category
+        val trimmed = tokens.dropLastWhile { it in setOf("neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach") }
+        for (n in 2 downTo 1) {
+            if (trimmed.size >= n) {
+                val phrase = trimmed.takeLast(n).joinToString(" ")
+                if (phrase in spendingCategories) return phrase
+            }
+        }
+        return null
+    }
+
     private val knownSubscriptions = setOf("Netflix", "Spotify Premium", "Disney+ Hotstar", "Tata Play", "Cult.fit")
 
     override fun detectRecurring(transactions: List<RawTransactionLine>): List<ParsedMandateCandidate> {
@@ -66,8 +120,15 @@ class DefaultRecurringDetector : RecurringDetector {
         }
         val candidates = mutableListOf<ParsedMandateCandidate>()
 
+        // The statement's own category says groceries, shopping, dining...: habits, not subscriptions,
+        // unless the narration carries explicit mandate wording (AUTOPAY, SI-, NACH...)
+        val relevant = debits.filter { tx ->
+            val cat = categoryOf(tx)
+            cat == null || cat !in spendingCategories || mandateKeywords.any { tx.description.contains(it, ignoreCase = true) }
+        }
+
         // Group by normalized merchant name
-        val grouped = debits.groupBy { normalizeMerchantName(it.description) }
+        val grouped = relevant.groupBy { normalizeMerchantName(it.description) }
 
         for ((normalizedMerchant, fullGroup) in grouped) {
             // One merchant can mix a subscription with ordinary purchases (a Prime fee among shopping);
@@ -124,7 +185,11 @@ class DefaultRecurringDetector : RecurringDetector {
                 val knownSubscriptionOnCycle = normalizedMerchant in knownSubscriptions && isRegularInterval
 
                 // Two similar debits that are not a week/month/quarter/year apart are just repeat purchases
-                val similarOnCycle = isAmountSimilar && isRegularInterval
+                val nearIdentical = (maxAmt - minAmt) <= maxAmt * 0.02
+                val steadySpacing = intervalSpread(intervalsDays) <= MAX_CYCLE_SPREAD_DAYS
+                // Two debits must match almost exactly; more can drift 10% but must keep a steady rhythm
+                val similarOnCycle = isAmountSimilar && isRegularInterval &&
+                    (if (txGroup.size == 2) nearIdentical else steadySpacing)
 
                 // Bills (electricity, broadband, postpaid) repeat on a steady cycle but the amount changes
                 val steadyCycle = txGroup.size >= 3 && isRegularInterval && intervalSpread(intervalsDays) <= MAX_CYCLE_SPREAD_DAYS &&
@@ -212,12 +277,12 @@ class DefaultRecurringDetector : RecurringDetector {
     }
 
     override fun normalizeMerchantName(rawNarration: String): String {
-        var clean = rawNarration.uppercase().trim()
+        var clean = cutCategorySuffix(rawNarration).uppercase().trim()
 
         clean = clean.replace(Regex("\\([^)]*\\)"), " ")
 
         // Channel words that start a narration ("ECS/SI DR - X", "UPI DR - X", "SIP DR X", "BILLPAY X")
-        clean = clean.replace(Regex("^(?:(?:ECS|SI|DR|CR|UPI|POS|NACH|NEFT|EMI|SIP|BILLPAY|BILL|ATM|WDL|IMPS|RTGS|ACH|ECOM|AUTOPAY|DEBIT|CREDIT)(?:[ /]+|$))+(?:[-:]+ *)?"), " ")
+        clean = clean.replace(Regex("^(?:(?:ECS|SI|DR|CR|UPI|POS|NACH|NEFT|EMI|SIP|BILLPAY|BILL|ATM|WDL|IMPS|RTGS|ACH|ECOM|AUTOPAY|AUTODEBIT|DEBIT|CREDIT|RECURRING)(?:[ /]+|$))+(?:[-:]+ *)?"), " ")
         clean = clean.trim()
 
         // 1. Strip UPI IDs (e.g. swiggy@icici, spotify@paytm, user@okaxis)
@@ -246,6 +311,13 @@ class DefaultRecurringDetector : RecurringDetector {
         clean = clean.replace(Regex("\\b[0-9]+\\b"), " ")
         clean = clean.trim().replace(Regex("\\s+"), " ")
 
+        // Bullets separate parts of a narration
+        clean = clean.replace(Regex("[·•]"), " ").trim()
+        // Trailing mode words (UPI, NEFT, SI...) are the payment channel, not the merchant
+        val words = clean.split(" ").filter { it.isNotEmpty() }.toMutableList()
+        while (words.size > 1 && words.last().lowercase() in modeWords) words.removeAt(words.lastIndex)
+        clean = words.joinToString(" ")
+
         // Known merchant mapping
         val merchantDisplayMap = mapOf(
             "NETFLIX" to "Netflix",
@@ -269,7 +341,13 @@ class DefaultRecurringDetector : RecurringDetector {
         )
 
         for ((key, displayName) in merchantDisplayMap) {
-            if (clean.contains(key)) {
+            // Whole-word match only ("JIOSAAVN PRO" is not "JIO"). Brands that run several products
+            // (Jio, Airtel, Apple, Amazon) are renamed only when nothing but filler follows the brand,
+            // so "APPLE ARCADE" is not relabelled "Apple Services".
+            val rest = clean.replace(Regex("\\b" + Regex.escape(key) + "\\b"), " ").trim()
+            if (rest == clean.trim()) continue
+            val ambiguous = key in ambiguousBrands
+            if (!ambiguous || rest.split(" ").filter { it.isNotEmpty() }.all { it in fillerWords }) {
                 return displayName
             }
         }

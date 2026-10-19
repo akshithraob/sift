@@ -110,9 +110,10 @@ class DefaultStatementParser : StatementParser {
         // Statements that spread one transaction over several lines (date and narration first, the
         // amounts a line or two later) defeat the line-by-line pass: read them as records instead
         val dated = source.count { l -> datePattern.find(l.trim())?.let { it.range.first <= 3 } == true }
-        if (dated >= 3 && result.size < dated / 2) {
-            val records = parseRecordLayout(source)
-            if (records.size > result.size) return records
+        if (result.size < 3 || (dated >= 3 && result.size < dated / 2)) {
+            val best = listOf(parseRecordLayout(source), parseDateHeaderLayout(source), parseCardLayout(source))
+                .maxByOrNull { it.size }
+            if (best != null && best.size > result.size) return best
         }
 
         return result
@@ -197,21 +198,144 @@ class DefaultStatementParser : StatementParser {
                 t.replace(refTokenPattern, " ").replace(leadingDates, " ").replace(Regex("""\s+"""), " ").trim().ifBlank { null }
             }.joinToString(" ").ifBlank { "Bank Transaction" }
 
-            val finalDirection = direction ?: resolveDirection(amount, balance, prevBalance, chosen.groups[3]?.value, text, null)
-            out.add(
-                RawTransactionLine(
-                    date = rec.date.value,
-                    description = text,
-                    debitAmount = if (finalDirection == Direction.DEBIT) amount else 0.0,
-                    creditAmount = if (finalDirection == Direction.CREDIT) amount else 0.0,
-                    isDebit = finalDirection == Direction.DEBIT,
-                    dateEpochMs = epochMs
-                )
-            )
+            // "ATM26010203763  \u00b7 CASH": the bullet introduces the statement's own category
+            val bulletCategory = Regex("""\s[\u00b7\u2022]\s*([A-Za-z][A-Za-z &]*)$""").find(text)
+            val narration = if (bulletCategory != null) text.removeRange(bulletCategory.range).trim() else text
+            val finalDirection = direction ?: resolveDirection(amount, balance, prevBalance, chosen.groups[3]?.value, narration, null)
+            out.add(buildTx(rec.date.value, narration.ifBlank { "Bank Transaction" }, amount, finalDirection, epochMs, bulletCategory?.groupValues?.get(1)?.trim()))
             prevBalance = balance ?: prevBalance
         }
         return out
     }
+
+    private val weekdayWords = Regex("""(?i)\b(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\b""")
+
+    /** "-" , the Unicode minus and dashes mean money out; "+" means money in. */
+    private fun signBefore(line: String, m: MatchResult): Direction? {
+        var i = m.range.first - 1
+        while (i >= 0 && line[i].isWhitespace()) i--
+        return when (if (i >= 0) line[i] else ' ') {
+            '+' -> Direction.CREDIT
+            '-', '\u2212', '\u2013', '\u2014' -> Direction.DEBIT
+            else -> null
+        }
+    }
+
+    /**
+     * Rows grouped under a date heading ("Friday, 01 May 2026"): the heading line holds only a date,
+     * and each row beneath it has a narration and signed amounts but no date of its own.
+     */
+    private fun parseDateHeaderLayout(lines: List<String>): List<RawTransactionLine> {
+        val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
+        fun headerDate(line: String): MatchResult? {
+            val d = datePattern.find(line) ?: return null
+            val rest = datePattern.replace(line, " ").replace(weekdayWords, " ").replace(Regex("""[,\s]"""), "")
+            return if (rest.isEmpty()) d else null
+        }
+        if (clean.count { headerDate(it) != null } < 3) return emptyList()
+
+        val out = mutableListOf<RawTransactionLine>()
+        var current: MatchResult? = null
+        var prevBalance: Double? = null
+        for (line in clean) {
+            val header = headerDate(line)
+            if (header != null) { current = header; continue }
+            val date = current ?: run {
+                if (balanceRowPattern.containsMatchIn(line) && openingPattern.containsMatchIn(line)) {
+                    prevBalance = amountPattern.findAll(line).lastOrNull()?.let { amountOf(it) } ?: prevBalance
+                }
+                null
+            } ?: continue
+            if (looksLikeHeaderText(line) || skipLinePattern.containsMatchIn(line) || balanceRowPattern.containsMatchIn(line)) continue
+            val amounts = amountPattern.findAll(line).toList()
+            if (amounts.isEmpty()) continue
+            val epochMs = parseDateStrToMillis(date.value)
+            if (epochMs == 0L) continue
+
+            val chosen = amounts.first()
+            val amount = amountOf(chosen)
+            val balance = if (amounts.size >= 2) amountOf(amounts.last()) else null
+            if (amount <= 0.0) continue
+            val text = removeRanges(line, amounts.map { it.range })
+                .replace(refTokenPattern, " ").replace(Regex("""[\u2212\u2013\u2014+]"""), " ")
+                .replace(Regex("""\s+"""), " ").trim().ifBlank { "Bank Transaction" }
+            val direction = signBefore(line, chosen)
+                ?: resolveDirection(amount, balance, prevBalance, chosen.groups[3]?.value, text, null)
+            out.add(buildTx(date.value, text, amount, direction, epochMs, null))
+            prevBalance = balance ?: prevBalance
+        }
+        return out
+    }
+
+    /**
+     * Card-style rows: a narration line (often with a one-letter icon in front), a line like
+     * "Mon 01 Jun · Salary · NEFT · REF123" with the date but no year, then a signed amount and a
+     * "bal" line. The year comes from the statement period.
+     */
+    private fun parseCardLayout(lines: List<String>): List<RawTransactionLine> {
+        val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
+        val meta = Regex("""^(?:[A-Za-z]{3,9},?\s+)?(\d{1,2})\s+([A-Za-z]{3,9})\.?\s*[\u00b7\u2022|]\s*(.+)$""")
+        val metaIdx = clean.indices.filter { meta.matches(clean[it]) && it > 0 }
+        if (metaIdx.size < 3) return emptyList()
+
+        // Statement period: the first line holding two full dates ("01 Jun 2026 - 31 Aug 2026")
+        val period = clean.firstOrNull { datePattern.findAll(it).count() >= 2 }
+            ?.let { datePattern.find(it)?.value }?.let { parseDateStrToMillis(it) }?.takeIf { it > 0 }
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = period ?: System.currentTimeMillis() }
+        val startYear = cal.get(java.util.Calendar.YEAR)
+        val startMonth = cal.get(java.util.Calendar.MONTH)
+        val monthNames = listOf("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+        val out = mutableListOf<RawTransactionLine>()
+        var prevBalance: Double? = clean.firstOrNull { openingPattern.containsMatchIn(it) || it.startsWith("Starting balance", true) }
+            ?.let { amountPattern.findAll(it).lastOrNull() }?.let { amountOf(it) }
+        for (i in metaIdx) {
+            val m = meta.matchEntire(clean[i]) ?: continue
+            val day = m.groupValues[1]
+            val monthIdx = monthNames.indexOf(m.groupValues[2].take(3).lowercase())
+            if (monthIdx < 0) continue
+            val year = if (monthIdx < startMonth) startYear + 1 else startYear
+            val dateStr = "$day ${monthNames[monthIdx].replaceFirstChar { it.titlecase(Locale.ENGLISH) }} $year"
+            val epochMs = parseDateStrToMillis(dateStr)
+            if (epochMs == 0L) continue
+
+            val amountIdx = (i + 1..minOf(i + 3, clean.lastIndex)).firstOrNull { amountPattern.find(clean[it]) != null } ?: continue
+            val amountLine = clean[amountIdx]
+            val amounts = amountPattern.findAll(amountLine).toList()
+            val chosen = amounts.first()
+            val amount = amountOf(chosen)
+            if (amount <= 0.0) continue
+            val balLine = clean.getOrNull(amountIdx + 1)?.takeIf { it.startsWith("bal", true) }
+            val balance = (balLine ?: amountLine).let { amountPattern.findAll(it).lastOrNull() }
+                ?.takeIf { balLine != null || amounts.size >= 2 }?.let { amountOf(it) }
+
+            val narration = clean[i - 1].replace(Regex("""^[A-Za-z]\s+(?=\S)"""), "")
+                .replace(refTokenPattern, " ").replace(Regex("""\s+"""), " ").trim().ifBlank { "Bank Transaction" }
+            val category = m.groupValues[3].split('\u00b7', '\u2022', '|').map { it.trim() }.firstOrNull()?.ifBlank { null }
+            val direction = signBefore(amountLine, chosen)
+                ?: resolveDirection(amount, balance, prevBalance, null, narration, null)
+            out.add(buildTx(dateStr, narration, amount, direction, epochMs, category))
+            prevBalance = balance ?: prevBalance
+        }
+        return out
+    }
+
+    private fun removeRanges(line: String, ranges: List<IntRange>): String {
+        val sb = StringBuilder(line)
+        ranges.sortedByDescending { it.first }.forEach { sb.replace(it.first, it.last + 1, " ") }
+        return sb.toString()
+    }
+
+    private fun buildTx(date: String, text: String, amount: Double, direction: Direction, epochMs: Long, category: String?) =
+        RawTransactionLine(
+            date = date,
+            description = text,
+            debitAmount = if (direction == Direction.DEBIT) amount else 0.0,
+            creditAmount = if (direction == Direction.CREDIT) amount else 0.0,
+            isDebit = direction == Direction.DEBIT,
+            dateEpochMs = epochMs,
+            category = category
+        )
 
     private val dateOnlyPattern = Regex("""^\d{1,2}\s+[A-Za-z]{3,9}\.?\s+(?:20)?\d{2}$""")
     private val timeOnlyPattern = Regex("""(?i)^\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?$""")
@@ -395,10 +519,15 @@ class DefaultStatementParser : StatementParser {
         // Description: the line without dates and amounts
         val remove = mutableListOf<IntRange>()
         remove.addAll(amounts.map { it.range })
+        // A serial number in front of the date ("12  05-02-2026 SI - X") is not part of the narration
+        if (dateMatch.range.first > 0 && line.substring(0, dateMatch.range.first).isBlank().not() &&
+            line.substring(0, dateMatch.range.first).trim().all { it.isDigit() }
+        ) remove.add(0 until dateMatch.range.first)
         datePattern.findAll(line).filter { it.range.first <= 40 }.forEach { remove.add(it.range) }
         val sb = StringBuilder(line)
         remove.sortedByDescending { it.first }.forEach { sb.replace(it.first, it.last + 1, " ") }
         val desc = sb.toString()
+            .replace(refTokenPattern, " ")
             .replace(Regex("""[,|;\t]"""), " ")
             .split(Regex("""\s+"""))
             .filter { it.isNotBlank() && it != "-" && !it.equals("DR", true) && !it.equals("CR", true) }

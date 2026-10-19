@@ -67,7 +67,9 @@ data class RawTransactionLine(
     val creditAmount: Double = 0.0,
     val isDebit: Boolean = debitAmount > 0.0,
     val reference: String? = null,
-    val dateEpochMs: Long = 0L
+    val dateEpochMs: Long = 0L,
+    /** The statement's own category for the row (Groceries, Subscriptions...), when it prints one. */
+    val category: String? = null
 ) {
     val amount: Double get() = if (isDebit) debitAmount else creditAmount
 }

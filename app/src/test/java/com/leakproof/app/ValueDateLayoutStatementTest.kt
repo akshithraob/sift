@@ -55,7 +55,7 @@ class ValueDateLayoutStatementTest {
         assertEquals(619.0, found.getValue("Microsoft Personal").amount, 0.001)
         assertEquals(31800.0, found.getValue("Home Loan A C").amount, 0.001)
         assertEquals(10000.0, found.getValue("Flexi Cap Fund").amount, 0.001)
-        assertTrue(found.containsKey("Disney+ Hotstar"))
+        assertTrue(found.containsKey("Jiohotstar Super"))
         assertFalse(found.keys.any { it.contains("Shop", ignoreCase = true) })
     }
 }

@@ -64,7 +64,9 @@ class DefaultStatementParser : StatementParser {
         var headerFound = false
         var prevBalance: Double? = null
 
-        for (line in joinQuotedLines(lines)) {
+        // Wallet and fintech statements print each transaction as a block of short lines
+        val source = normaliseBlockLayout(lines) ?: lines
+        for (line in joinQuotedLines(source)) {
             val trimmed = line.trim()
             if (trimmed.isBlank() || trimmed.startsWith("#")) continue
 
@@ -106,6 +108,44 @@ class DefaultStatementParser : StatementParser {
         }
 
         return result
+    }
+
+    private val dateOnlyPattern = Regex("""^\d{1,2}\s+[A-Za-z]{3,9}\.?\s+(?:20)?\d{2}$""")
+    private val timeOnlyPattern = Regex("""(?i)^\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?$""")
+    private val amountTailPattern = Regex("""^₹?\s*[\d,]+\.\d{2}(?:\s+₹?\s*[\d,]+\.\d{2})?$""")
+
+    /**
+     * Some statements (UPI wallets and neo-banks) do not use one line per transaction. Each one is a
+     * block: a date line, a time line, "To <payee>" or "From <payee>", reference lines, then an
+     * "amount closing-balance" line. Returns those blocks as single lines
+     * ("16 Oct 2026 To Payee 482.00 Dr 0.00"), or null when the text is not laid out that way.
+     * "To" is a debit and "From" a credit. Reference numbers and UPI IDs are dropped here.
+     */
+    private fun normaliseBlockLayout(lines: List<String>): List<String>? {
+        val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
+        val starts = clean.indices.filter { i ->
+            dateOnlyPattern.matches(clean[i]) && clean.getOrNull(i + 1)?.let { timeOnlyPattern.matches(it) } == true
+        }
+        if (starts.size < 3) return null
+
+        val out = mutableListOf<String>()
+        for ((k, start) in starts.withIndex()) {
+            val end = if (k + 1 < starts.size) starts[k + 1] else clean.size
+            val body = clean.subList(start + 2, end)
+                .filterNot { skipLinePattern.containsMatchIn(it) || looksLikeHeaderText(it) }
+            val narration = body.firstOrNull { it.startsWith("To ", true) || it.startsWith("From ", true) }
+                ?: body.firstOrNull { !amountTailPattern.matches(it) && !it.contains(':') }
+                ?: continue
+            val amountLine = body.lastOrNull { amountTailPattern.matches(it) } ?: continue
+            val marker = when {
+                narration.startsWith("To ", true) -> " Dr"
+                narration.startsWith("From ", true) -> " Cr"
+                else -> ""
+            }
+            val parts = amountLine.split(Regex("""\s+"""))
+            out.add("${clean[start]} $narration ${parts[0]}$marker ${parts.drop(1).joinToString(" ")}".trim())
+        }
+        return out
     }
 
     override fun parseCsv(csvContent: String): List<RawTransactionLine> {

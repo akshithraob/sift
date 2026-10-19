@@ -20,8 +20,18 @@ class DefaultRecurringDetector : RecurringDetector {
         "STANDING INSTR", "AUTO DEBIT"
     )
 
+    private companion object {
+        const val MIN_SUBSCRIPTION_AMOUNT = 10.0
+    }
+
+    private val knownSubscriptions = setOf("Netflix", "Spotify Premium", "Disney+ Hotstar", "Tata Play", "Cult.fit")
+
     override fun detectRecurring(transactions: List<RawTransactionLine>): List<ParsedMandateCandidate> {
-        val debits = transactions.filter { it.isDebit && it.debitAmount > 0.0 }
+        // Debits under ₹10 are verification or test transfers, not subscriptions (unless marked as a mandate)
+        val debits = transactions.filter {
+            it.isDebit && it.debitAmount > 0.0 &&
+                (it.debitAmount >= MIN_SUBSCRIPTION_AMOUNT || mandateKeywords.any { k -> it.description.contains(k, ignoreCase = true) })
+        }
         val candidates = mutableListOf<ParsedMandateCandidate>()
 
         // Group by normalized merchant name
@@ -71,7 +81,13 @@ class DefaultRecurringDetector : RecurringDetector {
                         avgInterval in 75.0..105.0 ||
                         avgInterval in 340.0..390.0
 
-                if (isAmountSimilar || hasMandatePrefix) {
+                // A known subscription service on a regular cycle counts even when the price changed
+                val knownSubscriptionOnCycle = normalizedMerchant in knownSubscriptions && isRegularInterval
+
+                // Two similar debits that are not a week/month/quarter/year apart are just repeat purchases
+                val similarOnCycle = isAmountSimilar && (isRegularInterval || txGroup.size >= 3)
+
+                if (similarOnCycle || hasMandatePrefix || knownSubscriptionOnCycle) {
                     val avgAmount = Math.round(amounts.average() * 100.0) / 100.0
                     val confidence = when {
                         hasMandatePrefix && isAmountSimilar -> Confidence.HIGH
@@ -156,7 +172,7 @@ class DefaultRecurringDetector : RecurringDetector {
         clean = clean.replace(Regex("[a-zA-Z0-9._]+@[a-zA-Z0-9.]+"), " ")
 
         // 2. Strip standard Indian bank transfer prefixes
-        clean = clean.replace(Regex("^(TRANSFER TO\\s+[0-9]+/UPI/|UPI/CR/[0-9]+/|UPI-MANDATE-|UPI-AUTOPAY-|UPI/|UPI-|ACH D-|ACH-|ACH/|NACH-|NACH/|IB SI-|SI-|SI/|POS\\s+[0-9]+|POS/|POS-|NEFT-|RTGS-|IMPS-|BY TRANSFER-)"), " ")
+        clean = clean.replace(Regex("^(TO\\s+|FROM\\s+|TRANSFER TO\\s+[0-9]+/UPI/|UPI/CR/[0-9]+/|UPI-MANDATE-|UPI-AUTOPAY-|UPI/|UPI-|ACH D-|ACH-|ACH/|NACH-|NACH/|IB SI-|SI-|SI/|POS\\s+[0-9]+|POS/|POS-|NEFT-|RTGS-|IMPS-|BY TRANSFER-)"), " ")
 
         // 3. Strip alphanumeric reference codes / IFSC / Bank codes (e.g. HDFC000123, UTIR0000123, MND98124)
         clean = clean.replace(Regex("\\b[A-Z]{4}0[A-Z0-9]{6}\\b"), " ")

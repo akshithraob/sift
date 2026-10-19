@@ -33,6 +33,7 @@ object Destinations {
     const val MANUAL_ADD = "manual_add"
     const val MANUAL_EDIT = "manual_edit/{id}"
     const val SETTINGS = "settings"
+    const val CALENDAR = "calendar"
 
     fun detail(id: Long) = "detail/$id"
     fun edit(id: Long) = "manual_edit/$id"
@@ -108,7 +109,8 @@ fun LeakproofNavGraph(
                 onNavigateToImport = { navController.navigate(Destinations.IMPORT) },
                 onNavigateToManualAdd = { navController.navigate(Destinations.MANUAL_ADD) },
                 onNavigateToDetail = { id -> navController.navigate(Destinations.detail(id)) },
-                onNavigateToSettings = { navController.navigate(Destinations.SETTINGS) }
+                onNavigateToSettings = { navController.navigate(Destinations.SETTINGS) },
+                onNavigateToCalendar = { navController.navigate(Destinations.CALENDAR) }
             )
         }
 
@@ -163,6 +165,17 @@ fun LeakproofNavGraph(
                 subscriptionId = id,
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Destinations.CALENDAR) {
+            com.leakproof.app.ui.screens.CalendarScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToDetail = { id ->
+                    viewModel.selectSubscription(id)
+                    navController.navigate(Destinations.detail(id))
+                }
             )
         }
 

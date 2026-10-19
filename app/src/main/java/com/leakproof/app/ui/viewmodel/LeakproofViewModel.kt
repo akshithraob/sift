@@ -270,6 +270,14 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    // Appearance
+    val themeMode = MutableStateFlow(prefs.themeMode)
+
+    fun setThemeMode(mode: Int) {
+        prefs.themeMode = mode
+        themeMode.value = mode
+    }
+
     // Insights for the dashboard
     val monthlyBudget = MutableStateFlow(prefs.monthlyBudget)
 
@@ -425,6 +433,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             _statementCoverageDays.value = null
             _backupResult.value = null
             monthlyBudget.value = 0.0
+            themeMode.value = 0
             isAppLockSettingEnabled.value = true
             onComplete()
         }

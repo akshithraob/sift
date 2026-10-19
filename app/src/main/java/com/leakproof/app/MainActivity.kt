@@ -1,5 +1,11 @@
 package com.leakproof.app
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.isSystemInDarkTheme
+import android.graphics.Color
+import androidx.activity.SystemBarStyle
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
@@ -39,11 +45,23 @@ class MainActivity : FragmentActivity() {
             )
         }
 
-        enableEdgeToEdge()
-
         setContent {
-            LeakproofTheme {
-                                LeakproofNavGraph(viewModel = viewModel)
+            val themeMode by viewModel.themeMode.collectAsState()
+            val systemDark = isSystemInDarkTheme()
+            val dark = when (themeMode) {
+                1 -> false
+                2 -> true
+                else -> systemDark
+            }
+            DisposableEffect(dark) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+                    navigationBarStyle = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                )
+                onDispose {}
+            }
+            LeakproofTheme(themeMode = themeMode) {
+                LeakproofNavGraph(viewModel = viewModel)
             }
         }
     }

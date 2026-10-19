@@ -1,5 +1,8 @@
 package com.leakproof.app.ui.screens
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -251,24 +254,38 @@ fun ReviewScreen(
                         }
                     }
                 }
-                items(candidates, key = { it.id }) { candidate ->
-                    CandidateReviewCard(
-                        diffNote = diff?.matchFor(candidate.id)?.let { diffNote(it) },
-                        candidate = candidate,
-                        onConfirm = {
-                            viewModel.confirmCandidates(listOf(candidate)) {
-                                if (candidates.size <= 1) {
-                                    onSavedSuccessfully()
-                                }
-                            }
-                        },
-                        onDismiss = {
-                            viewModel.removePendingCandidate(candidate.id)
-                        },
-                        onEdit = {
-                            editingCandidate = candidate
-                        }
+                item(key = "swipe_hint") {
+                    Text(
+                        text = "Swipe right to confirm, left to dismiss, or use the buttons.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("swipe_hint")
                     )
+                }
+                items(candidates, key = { it.id }) { candidate ->
+                    val confirm = {
+                        viewModel.confirmCandidates(listOf(candidate)) {
+                            if (candidates.size <= 1) {
+                                onSavedSuccessfully()
+                            }
+                        }
+                    }
+                    val dismiss = { viewModel.removePendingCandidate(candidate.id) }
+                    SwipeableCandidate(
+                        onConfirm = confirm,
+                        onDismiss = dismiss,
+                        modifier = Modifier.animateItem()
+                    ) {
+                        CandidateReviewCard(
+                            diffNote = diff?.matchFor(candidate.id)?.let { diffNote(it) },
+                            candidate = candidate,
+                            onConfirm = confirm,
+                            onDismiss = dismiss,
+                            onEdit = {
+                                editingCandidate = candidate
+                            }
+                        )
+                    }
                 }
                 diff?.missing?.takeIf { it.isNotEmpty() }?.let { missing ->
                     item(key = "missing_section") {
@@ -299,6 +316,58 @@ fun ReviewScreen(
             }
         }
     }
+}
+
+/** Swipe right to confirm, left to dismiss. The card's own buttons still work for everyone else. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableCandidate(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val haptics = com.leakproof.app.ui.components.rememberHaptics()
+    val state = androidx.compose.material3.rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd -> { haptics.confirm(); onConfirm(); true }
+                androidx.compose.material3.SwipeToDismissBoxValue.EndToStart -> { haptics.tap(); onDismiss(); true }
+                else -> false
+            }
+        },
+        positionalThreshold = { distance -> distance * 0.4f }
+    )
+    androidx.compose.material3.SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        backgroundContent = {
+            val direction = state.dismissDirection
+            val confirming = direction == androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd
+            val color = when (direction) {
+                androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd -> com.leakproof.app.ui.theme.StatusActive
+                androidx.compose.material3.SwipeToDismissBoxValue.EndToStart -> StatusCancelled
+                else -> Color.Transparent
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(color.copy(alpha = 0.18f))
+                    .padding(horizontal = 24.dp),
+                contentAlignment = if (confirming) Alignment.CenterStart else Alignment.CenterEnd
+            ) {
+                if (direction != androidx.compose.material3.SwipeToDismissBoxValue.Settled) {
+                    Icon(
+                        imageVector = if (confirming) Icons.Default.Check else Icons.Default.Close,
+                        contentDescription = if (confirming) "Confirm" else "Dismiss",
+                        tint = color,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+    ) { content() }
 }
 
 private fun diffNote(match: MatchedCandidate): String = when {

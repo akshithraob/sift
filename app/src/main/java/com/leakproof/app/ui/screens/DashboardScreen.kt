@@ -1,5 +1,17 @@
 package com.leakproof.app.ui.screens
 
+import androidx.compose.material.icons.filled.CalendarMonth
+import com.leakproof.app.ui.components.rememberHaptics
+import com.leakproof.app.ui.components.pressScale
+import com.leakproof.app.ui.components.entrance
+import com.leakproof.app.ui.components.ForecastCard
+import com.leakproof.app.ui.components.AnimatedAmount
+import com.leakproof.app.insights.Schedule
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -102,7 +114,8 @@ fun DashboardScreen(
     onNavigateToImport: () -> Unit,
     onNavigateToManualAdd: () -> Unit,
     onNavigateToDetail: (Long) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToCalendar: () -> Unit = {}
 ) {
     val subscriptions by viewModel.allSubscriptions.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -116,6 +129,7 @@ fun DashboardScreen(
     val health = remember(subscriptions, leaks) { HealthScore.compute(subscriptions, leaks) }
 
     val kindSplit = remember(subscriptions) { KindBreakdown.monthlyByKind(subscriptions) }
+    val forecast = remember(subscriptions) { Schedule.forecast(subscriptions) }
     val emis = active.filter { it.kind == "EMI" }
 
     val comingUp = active
@@ -137,6 +151,9 @@ fun DashboardScreen(
             TopAppBar(
                 title = { BrandMark() },
                 actions = {
+                    IconButton(onClick = onNavigateToCalendar, modifier = Modifier.testTag("calendar_button")) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = "Calendar", tint = MaterialTheme.colorScheme.onBackground)
+                    }
                     IconButton(onClick = onNavigateToImport, modifier = Modifier.testTag("import_action_button")) {
                         Icon(Icons.Default.FileDownload, contentDescription = "Import", tint = MaterialTheme.colorScheme.onBackground)
                     }
@@ -199,6 +216,13 @@ fun DashboardScreen(
                 LeaksCard(leaks)
             }
 
+            if (forecast.any { it.total > 0 }) {
+                item {
+                    SectionTitle("Coming months")
+                    ForecastCard(forecast)
+                }
+            }
+
             if (emis.isNotEmpty()) {
                 item {
                     SectionTitle("Debt-free plan")
@@ -232,7 +256,7 @@ fun DashboardScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { viewModel.searchQuery.value = it },
-                    placeholder = { Text("Search by name or last 4 digits") },
+                    placeholder = { Text("Search payments", maxLines = 1) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
@@ -262,6 +286,12 @@ fun DashboardScreen(
                                 selectedContainerColor = BrandPrimary.copy(alpha = 0.18f),
                                 selectedLabelColor = MaterialTheme.colorScheme.primary
                             ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedFilter == key,
+                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                                selectedBorderColor = BrandPrimary.copy(alpha = 0.5f)
+                            ),
                             modifier = Modifier.testTag("filter_$key")
                         )
                     }
@@ -279,8 +309,8 @@ fun DashboardScreen(
                     )
                 }
             } else {
-                items(shown, key = { it.id }) { sub ->
-                    SubscriptionRow(sub) { onNavigateToDetail(sub.id) }
+                itemsIndexed(shown, key = { _, sub -> sub.id }) { index, sub ->
+                    SubscriptionRow(sub, modifier = Modifier.entrance(index)) { onNavigateToDetail(sub.id) }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
@@ -307,7 +337,7 @@ private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus, h
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "YOU PAY EVERY MONTH",
+                    text = "MONTHLY OUTGO",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
@@ -331,10 +361,9 @@ private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus, h
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = CurrencyFormatter.format(totalMonthly),
-                fontSize = 42.sp,
-                fontWeight = FontWeight.ExtraBold,
+            AnimatedAmount(
+                amount = totalMonthly,
+                style = MaterialTheme.typography.displayLarge,
                 color = Color.White
             )
             Text(
@@ -346,6 +375,11 @@ private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus, h
 
             if (budget.level != BudgetLevel.NONE) {
                 Spacer(modifier = Modifier.height(16.dp))
+                val animatedRatio by animateFloatAsState(
+                    targetValue = budget.ratio.coerceIn(0f, 1f),
+                    animationSpec = tween(900, easing = FastOutSlowInEasing),
+                    label = "budgetRatio"
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -355,7 +389,7 @@ private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus, h
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(budget.ratio.coerceIn(0f, 1f))
+                            .fillMaxWidth(animatedRatio)
                             .height(8.dp)
                             .clip(CircleShape)
                             .background(if (budget.level == BudgetLevel.OVER) Color(0xFFFFD54F) else Color.White)
@@ -531,10 +565,12 @@ private fun ComingUpCard(items: List<SubscriptionEntity>, onClick: (Long) -> Uni
 // ---------------------------------------------------------------- List row
 
 @Composable
-fun SubscriptionItemCard(subscription: SubscriptionEntity, onClick: () -> Unit) = SubscriptionRow(subscription, onClick)
+fun SubscriptionItemCard(subscription: SubscriptionEntity, onClick: () -> Unit) = SubscriptionRow(subscription, onClick = onClick)
 
 @Composable
-private fun SubscriptionRow(subscription: SubscriptionEntity, onClick: () -> Unit) {
+private fun SubscriptionRow(subscription: SubscriptionEntity, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val haptics = rememberHaptics()
     val railLabel = when (subscription.rail.uppercase()) {
         "UPI" -> "UPI Autopay"
         "NACH" -> "e-NACH"
@@ -546,8 +582,9 @@ private fun SubscriptionRow(subscription: SubscriptionEntity, onClick: () -> Uni
     val inactive = subscription.status != "ACTIVE"
 
     AppCard(
-        modifier = Modifier
-            .clickable(onClick = onClick)
+        modifier = modifier
+            .pressScale(interaction)
+            .clickable(interactionSource = interaction, indication = null) { haptics.tap(); onClick() }
             .testTag("subscription_item_${subscription.id}")
     ) {
         Row(modifier = Modifier.padding(Spacing.card), verticalAlignment = Alignment.CenterVertically) {

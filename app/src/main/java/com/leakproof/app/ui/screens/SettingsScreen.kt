@@ -251,6 +251,32 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Appearance Section
+            SettingsSectionHeader(title = "APPEARANCE")
+            val themeMode by viewModel.themeMode.collectAsState()
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(0 to "System", 1 to "Light", 2 to "Dark").forEach { (mode, label) ->
+                        androidx.compose.material3.FilterChip(
+                            selected = themeMode == mode,
+                            onClick = { viewModel.setThemeMode(mode) },
+                            label = { Text(label) },
+                            modifier = Modifier.weight(1f).testTag("theme_$mode")
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Notifications Section
             SettingsSectionHeader(title = "NOTIFICATIONS")
 

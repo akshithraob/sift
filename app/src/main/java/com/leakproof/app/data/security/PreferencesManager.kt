@@ -12,6 +12,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_NOTIFICATIONS_ENABLED = "key_notifications_enabled"
         private const val KEY_CONSENT_VERSION = "key_consent_version"
         private const val KEY_CONSENT_AT_MS = "key_consent_at_ms"
+        private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_MONTHLY_BUDGET = "key_monthly_budget"
         private const val KEY_LAST_IMPORT_MS = "key_last_import_ms"
         private const val KEY_LAST_REIMPORT_NUDGE_MS = "key_last_reimport_nudge_ms"
@@ -37,6 +38,11 @@ class PreferencesManager(context: Context) {
     var consentAtMs: Long
         get() = prefs.getLong(KEY_CONSENT_AT_MS, 0L)
         set(value) = prefs.edit().putLong(KEY_CONSENT_AT_MS, value).apply()
+
+    /** 0 follows the system, 1 light, 2 dark. */
+    var themeMode: Int
+        get() = prefs.getInt(KEY_THEME_MODE, 0)
+        set(value) = prefs.edit().putInt(KEY_THEME_MODE, value).apply()
 
     /** Monthly subscription budget in rupees; 0 means no budget set. */
     var monthlyBudget: Double

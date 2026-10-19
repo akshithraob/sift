@@ -35,6 +35,7 @@ class DefaultStatementParser : StatementParser {
         var ref = -1
         var balance = -1
         var type = -1
+        var category = -1
     }
 
     private val balanceRowPattern = Regex(
@@ -54,7 +55,7 @@ class DefaultStatementParser : StatementParser {
         RegexOption.IGNORE_CASE
     )
     private val datePattern = Regex(
-        """(?i)\b(\d{1,2}[-/.]\d{1,2}[-/.](?:20)?\d{2}|\d{1,2}[-\s](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-\s,]+(?:20)?\d{2}|20\d{2}-\d{2}-\d{2})\b"""
+        """(?i)\b(\d{1,2}[-/.]\d{1,2}[-/.](?:20)?\d{2}|\d{1,2}[-\s](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-\s,]+(?:20)?\d{2}|20\d{2}[-/.]\d{2}[-/.]\d{2})\b"""
     )
     private val markerPattern = Regex("""(?i)\b(dr|cr)\b""")
 
@@ -407,7 +408,8 @@ class DefaultStatementParser : StatementParser {
 
     private fun String.isDescHeader() =
         contains("narration") || contains("description") || contains("particular") ||
-            contains("remark") || contains("details")
+            contains("remark") || contains("details") || contains("payee") || contains("merchant") ||
+            contains("beneficiary")
 
     // PDF text puts a header on one whitespace-separated line instead of in CSV cells
     private fun looksLikeHeaderText(line: String): Boolean {
@@ -426,6 +428,7 @@ class DefaultStatementParser : StatementParser {
                 cols.desc == -1 && lower.isDescHeader() -> cols.desc = i
                 cols.debit == -1 && (lower.contains("debit") || lower.contains("withdraw") || markerPattern.containsMatchIn(lower) && lower.contains("dr")) -> cols.debit = i
                 cols.credit == -1 && (lower.contains("credit") || lower.contains("deposit") || markerPattern.containsMatchIn(lower) && lower.contains("cr")) -> cols.credit = i
+                cols.category == -1 && (lower.contains("category") || lower.contains("bucket")) -> cols.category = i
                 cols.ref == -1 && (lower.contains("chq") || lower.contains("ref") || lower.contains("cheque")) -> cols.ref = i
             }
         }
@@ -445,7 +448,12 @@ class DefaultStatementParser : StatementParser {
         val creditCell = cell(cols.credit)
         val debit = cleanAmount(debitCell)
         val credit = cleanAmount(creditCell)
-        val typeMarker = cell(cols.type).lowercase().takeIf { it == "dr" || it == "cr" }
+        val typeMarker = when (cell(cols.type).lowercase()) {
+            "dr", "debit", "expense", "withdrawal", "out", "payment" -> "dr"
+            "cr", "credit", "income", "deposit", "in", "receipt" -> "cr"
+            else -> null
+        }
+        val category = cell(cols.category).takeIf { it.isNotBlank() }
 
         val amount: Double
         val direction: Direction
@@ -463,10 +471,15 @@ class DefaultStatementParser : StatementParser {
                 val skip = setOf(cols.date, cols.desc, cols.ref, cols.balance)
                 val found = tokens.withIndex()
                     .filter { it.index !in skip }
-                    .mapNotNull { (_, t) -> singleAmount(t) }
+                    .mapNotNull { (_, t) -> signedAmount(t) }
                     .firstOrNull() ?: return null
                 amount = found.first
-                direction = resolveDirection(amount, balance, prevBalance, found.second ?: typeMarker, desc, null)
+                // A minus sign means money out, a plus sign money in
+                direction = when (found.third) {
+                    '-' -> Direction.DEBIT
+                    '+' -> Direction.CREDIT
+                    else -> resolveDirection(amount, balance, prevBalance, found.second ?: typeMarker, desc, null)
+                }
             }
         }
 
@@ -478,7 +491,8 @@ class DefaultStatementParser : StatementParser {
                 creditAmount = if (direction == Direction.CREDIT) amount else 0.0,
                 isDebit = direction == Direction.DEBIT,
                 reference = cell(cols.ref).takeIf { it.isNotBlank() && it != "-" },
-                dateEpochMs = epochMs
+                dateEpochMs = epochMs,
+                category = category
             ),
             balance
         )
@@ -575,6 +589,16 @@ class DefaultStatementParser : StatementParser {
 
     private fun markerOf(cell: String): String? = markerPattern.findAll(cell).lastOrNull()?.value?.lowercase()
 
+    // An amount cell with an optional sign: "-645.34", "+1,03,500.00", "(299.00)", "299.00 Dr"
+    private fun signedAmount(token: String): Triple<Double, String?, Char?>? {
+        val m = Regex("""^\s*([-+\u2212(])?\s*(?:₹|Rs\.?|INR)?\s*(\d{1,3}(?:,\d{2,3})*|\d+)\.(\d{2})\s*\)?\s*(Dr|Cr)?\s*$""", RegexOption.IGNORE_CASE)
+            .find(token) ?: return null
+        val value = "${m.groupValues[2].replace(",", "")}.${m.groupValues[3]}".toDoubleOrNull() ?: return null
+        if (value <= 0.0) return null
+        val sign = when (m.groupValues[1]) { "-", "\u2212", "(" -> '-'; "+" -> '+'; else -> null }
+        return Triple(value, m.groupValues[4].lowercase().ifBlank { null }, sign)
+    }
+
     // A cell that holds just an amount, optionally with a currency symbol and Dr/Cr suffix
     private fun singleAmount(token: String): Pair<Double, String?>? {
         val m = amountPattern.find(token) ?: return null
@@ -622,7 +646,7 @@ class DefaultStatementParser : StatementParser {
             "dd MM yyyy", "dd MM yy",
             "dd MMM yyyy", "d MMM yyyy", "dd MMM yy", "d MMM yy",
             "dd-MMM-yyyy", "d-MMM-yyyy", "dd-MMM-yy", "d-MMM-yy",
-            "dd MMMM yyyy", "yyyy-MM-dd"
+            "dd MMMM yyyy", "yyyy-MM-dd", "yyyy/MM/dd", "yyyy.MM.dd"
         )
         for (fmt in formats) {
             try {

@@ -59,7 +59,7 @@ class DefaultRecurringDetector : RecurringDetector {
     /** Categories a statement prints for ordinary spending: repeats here are habits, not subscriptions. */
     private val spendingCategories = setOf(
         "groceries", "grocery", "shopping", "dining", "dining out", "food delivery", "food", "transport", "transfers",
-        "transfer", "cash", "travel", "fuel", "p2p", "entertainment", "restaurants", "restaurants & cafes"
+        "transfer", "cash", "travel", "fuel", "p2p", "entertainment", "restaurants", "restaurants & cafes", "health", "pharmacy", "medical"
     )
 
     /** Words that name a statement column (category or mode), not the merchant; trimmed off the end of a name. */
@@ -73,6 +73,11 @@ class DefaultRecurringDetector : RecurringDetector {
     private val fillerWords = setOf("premium", "subscription", "com", "app", "standard", "plus", "mobile", "family", "pro", "prime", "one", "gold", "membership", "recharge")
 
     private val ambiguousBrands = setOf("JIO", "AIRTEL", "APPLE", "AMAZON", "TATA PLAY", "TATAPLAY")
+
+    private val billCategories = setOf("utilities", "utility", "bills", "bill", "insurance", "loan emi", "loan", "emi")
+    private val billPattern = Regex("""(?i)\b(electric|electricity|water|gas|broadband|internet|fib(?:er|re)|postpaid|landline|bill|billpay|dth|recharge|maintenance|tax|charges|insurance|premium|emi|loan|fees?)\b""")
+
+    private val cashPattern = Regex("""(?i)\b(atm|cash withdrawal|cash wdl|cash deposit)\b|^cash$""")
 
     private val modeWords = setOf("neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach", "rtgs", "dr", "cr")
 
@@ -123,6 +128,9 @@ class DefaultRecurringDetector : RecurringDetector {
         // The statement's own category says groceries, shopping, dining...: habits, not subscriptions,
         // unless the narration carries explicit mandate wording (AUTOPAY, SI-, NACH...)
         val relevant = debits.filter { tx ->
+            val mandate = mandateKeywords.any { tx.description.contains(it, ignoreCase = true) }
+            // Cash withdrawals repeat but are never a subscription
+            if (!mandate && cashPattern.containsMatchIn(tx.description)) return@filter false
             val cat = categoryOf(tx)
             cat == null || cat !in spendingCategories || mandateKeywords.any { tx.description.contains(it, ignoreCase = true) }
         }
@@ -194,7 +202,9 @@ class DefaultRecurringDetector : RecurringDetector {
                 // Bills (electricity, broadband, postpaid) repeat on a steady cycle but the amount changes
                 val steadyCycle = txGroup.size >= 3 && isRegularInterval && intervalSpread(intervalsDays) <= MAX_CYCLE_SPREAD_DAYS &&
                     maxAmt <= minAmt * MAX_BILL_SWING
-                val variableBill = steadyCycle && !(similarOnCycle || hasMandatePrefix || knownSubscriptionOnCycle)
+                // An amount that keeps changing only counts when it looks like a bill (utilities, loan, insurance...)
+                val billLike = txGroup.any { tx -> billPattern.containsMatchIn(tx.description) || categoryOf(tx) in billCategories }
+                val variableBill = steadyCycle && billLike && !(similarOnCycle || hasMandatePrefix || knownSubscriptionOnCycle)
 
                 if (similarOnCycle || hasMandatePrefix || knownSubscriptionOnCycle || variableBill) {
                     val avgAmount = Math.round(amounts.average() * 100.0) / 100.0

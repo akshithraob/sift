@@ -20,6 +20,16 @@ import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/** What a scan did, so the screen can say why nothing was found instead of a vague failure. */
+data class ScanReport(
+    val candidates: List<ParsedMandateCandidate>,
+    val images: Int,
+    /** Images that could not be opened or recognised at all. */
+    val unreadable: Int,
+    /** Images that were read but contained no text. */
+    val noText: Int
+)
+
 class MlKitOcrScanner(
     private val context: Context,
     private val parser: MandateScreenshotParser
@@ -28,20 +38,33 @@ class MlKitOcrScanner(
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     }
 
-    suspend fun processScreenshots(uris: List<Uri>): List<ParsedMandateCandidate> = withContext(Dispatchers.IO) {
+    suspend fun processScreenshots(uris: List<Uri>): ScanReport = withContext(Dispatchers.IO) {
         val allCandidates = mutableListOf<ParsedMandateCandidate>()
+        var unreadable = 0
+        var noText = 0
 
         for (uri in uris) {
             val tempFile = createTempCacheFile(uri)
             try {
-                if (tempFile != null && tempFile.exists()) {
-                    val inputImage = InputImage.fromFilePath(context, Uri.fromFile(tempFile))
-                    val ocrDoc = runTextRecognition(inputImage)
-                    val candidates = parser.parseOcrDocument(ocrDoc)
-                    allCandidates.addAll(candidates)
+                if (tempFile == null || !tempFile.exists()) {
+                    unreadable++
+                    continue
+                }
+                val inputImage = InputImage.fromFilePath(context, Uri.fromFile(tempFile))
+                // One retry: the first call can fail while the on-device model is still loading
+                val ocrDoc = try {
+                    runTextRecognition(inputImage)
+                } catch (e: Exception) {
+                    runTextRecognition(inputImage)
+                }
+                if (ocrDoc.allLines.none { it.text.isNotBlank() }) {
+                    noText++
+                } else {
+                    allCandidates.addAll(parser.parseOcrDocument(ocrDoc))
                 }
             } catch (e: Exception) {
-                // If OCR fails on one image, continue gracefully with others
+                // One bad image must not stop the others; it is counted and reported
+                unreadable++
             } finally {
                 // Core Privacy Principle: user files never remain on device
                 tempFile?.delete()
@@ -49,7 +72,7 @@ class MlKitOcrScanner(
         }
 
         // Merge duplicates across overlapping screenshots
-        parser.mergeDuplicates(allCandidates)
+        ScanReport(parser.mergeDuplicates(allCandidates), uris.size, unreadable, noText)
     }
 
     private suspend fun runTextRecognition(image: InputImage): OcrDocument =

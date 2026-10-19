@@ -190,3 +190,20 @@ val verifyLegalPlaceholders = tasks.register("verifyLegalPlaceholders") {
 
 tasks.matching { it.name in setOf("assembleRelease", "bundleRelease") }
   .configureEach { dependsOn(verifyLegalPlaceholders) }
+
+// The shrunk (release/demo) build fails inside ML Kit on the first screenshot scan without its keep rules,
+// while debug builds work, so nothing else would notice. Fail the build if the rules are removed.
+val verifyMlKitKeepRules = tasks.register("verifyMlKitKeepRules") {
+  group = "verification"
+  description = "Fails a shrunk build if the ML Kit R8 keep rules are missing from proguard-rules.pro."
+  val rules = file("proguard-rules.pro")
+  inputs.file(rules)
+  doLast {
+    val text = rules.readText()
+    check(text.contains("-keep class com.google.mlkit.** { *; }") && text.contains("ComponentRegistrar")) {
+      "proguard-rules.pro must keep ML Kit classes. Without them, screenshot scanning fails in release builds."
+    }
+  }
+}
+tasks.matching { it.name.matches(Regex("(minify|assemble|bundle).*(Release|Demo)(WithR8)?")) }
+  .configureEach { dependsOn(verifyMlKitKeepRules) }

@@ -254,6 +254,18 @@ fun ReviewScreen(
                         }
                     }
                 }
+                item(key = "review_notice") {
+                    val notice by viewModel.reviewNotice.collectAsState()
+                    notice?.let {
+                        Text(
+                            text = it,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = androidx.compose.ui.graphics.Color(0xFFB26A00),
+                            modifier = Modifier.padding(bottom = 6.dp).testTag("review_notice")
+                        )
+                    }
+                }
                 item(key = "swipe_hint") {
                     Text(
                         text = "Swipe right to confirm, left to dismiss, or use the buttons.",

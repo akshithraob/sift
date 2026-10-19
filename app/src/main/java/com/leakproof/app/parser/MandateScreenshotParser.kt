@@ -50,6 +50,12 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
             }
         }
 
+        // Every "Up to ₹X" row is a mandate: if grouping found fewer, read the rows directly
+        val anchored = parseByAmountRows(allLines, detectedApp)
+        if (anchored.size > candidates.size) {
+            return mergeDuplicates(anchored)
+        }
+
         // If card grouping produced nothing (e.g. single mandate detail screen or unstructured text),
         // fallback to parsing the document as a single mandate
         if (candidates.isEmpty()) {
@@ -78,6 +84,36 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
         }
         val doc = OcrDocument(blocks = listOf(OcrTextBlock(text = ocrText, lines = ocrLines)))
         return parseOcrDocument(doc, sourceAppHint)
+    }
+
+    private val limitLine = Pattern.compile(
+        "^(?:up\\s*to|max(?:imum)?)\\s*[:\\-]?\\s*(?:[₹]|Rs\\.?|INR|[^0-9\\s,.:]{1,2})?\\s*[0-9]",
+        Pattern.CASE_INSENSITIVE
+    )
+
+    /**
+     * List layouts put one mandate per row with its limit ("Up to ₹399") on the right. Each such
+     * line anchors a row; everything between the midpoints to its neighbours belongs to it.
+     * Works from positions alone, so it does not depend on how the OCR grouped the lines.
+     */
+    private fun parseByAmountRows(lines: List<OcrTextLine>, detectedApp: String): List<ParsedMandateCandidate> {
+        val anchors = lines.filter { it.boundingBox != null && limitLine.matcher(it.text.trim()).find() }
+            .sortedBy { it.boundingBox!!.centerY }
+        if (anchors.isEmpty()) return emptyList()
+        val result = mutableListOf<ParsedMandateCandidate>()
+        for ((i, anchor) in anchors.withIndex()) {
+            val y = anchor.boundingBox!!.centerY
+            val top = if (i == 0) Int.MIN_VALUE else (anchors[i - 1].boundingBox!!.centerY + y) / 2
+            val bottom = if (i == anchors.lastIndex) Int.MAX_VALUE else (anchors[i + 1].boundingBox!!.centerY + y) / 2
+            // Header text above the first row is not part of it: start just above the anchor
+            val rowTop = if (i == 0) y - 70 else top
+            val row = lines.filter { l ->
+                val b = l.boundingBox ?: return@filter false
+                b.centerY in rowTop..bottom
+            }.sortedBy { it.boundingBox!!.centerY }
+            parseCardLines(row, detectedApp)?.let { result.add(it) }
+        }
+        return result
     }
 
     /**
@@ -144,9 +180,14 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
         val rawMerchant = extractMerchantFromLayout(cardLines)
             ?: extractMerchant(textLines, combinedText)
         // Play Store mandates list the merchant as plain "GOOGLE" with a playstore VPA beneath
-        val merchant = if (rawMerchant.equals("Google", ignoreCase = true) &&
+        val playMerchant = if (rawMerchant.equals("Google", ignoreCase = true) &&
             textLines.any { it.contains("playstore", ignoreCase = true) }
         ) "Google Play" else rawMerchant
+        // Google Pay shows "Subscription for ..." when the merchant name is too long to fit
+        val truncatedName = Regex("^subscription for\\b[\\s.\u2026]*$", RegexOption.IGNORE_CASE).matches(playMerchant.trim())
+        val merchant = if (truncatedName) {
+            if (textLines.any { it.contains("paytm", ignoreCase = true) }) "Subscription via Paytm" else "Autopay subscription"
+        } else playMerchant
 
         // 3. Frequency Extraction
         val frequency = extractFrequency(combinedText)
@@ -171,6 +212,9 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
 
         val reason = buildString {
             append("Detected in $detectedApp. ")
+            if (truncatedName) {
+                append("Google Pay cuts this name short. Tap Edit to name it. ")
+            }
             if (merchant == UNNAMED_PLAY_MANDATE) {
                 append("Google Pay doesn't show which app this is: import your Play Store subscriptions screenshot too, or tap Edit to name it. ")
             }
@@ -206,9 +250,12 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
 
     private fun detectSourceApp(text: String, hint: String?): String {
         if (!hint.isNullOrBlank()) return hint
-        val lower = text.lowercase()
+        // Payee handles ("paytm-1234@pt...") name the merchant's PSP, not the app being screenshotted
+        val lower = text.lines().filterNot { it.contains('@') }.joinToString("\n").lowercase()
+        val gPayLayout = lower.contains("how to use autopay") ||
+            (lower.contains("autopay on") && lower.contains("pending") && lower.contains("completed"))
         return when {
-            lower.contains("google pay") || lower.contains("gpay") -> "Google Pay"
+            lower.contains("google pay") || lower.contains("gpay") || gPayLayout -> "Google Pay"
             lower.contains("phonepe") -> "PhonePe"
             lower.contains("paytm") -> "Paytm"
             lower.contains("bhim") -> "BHIM UPI"
@@ -225,7 +272,7 @@ class DefaultMandateScreenshotParser : MandateScreenshotParser {
 
         // 1. Check for "Up to ₹X", "Max Amount: ₹X", "Maximum: ₹X"
         val maxPattern = Pattern.compile(
-            "(?:up\\s*to|max(?:imum)?(?:\\s*amount)?|limit)\\s*[:\\-]?\\s*(?:[₹]|Rs\\.?|INR)?\\s*([0-9,]+(?:\\.[0-9]{1,2})?)",
+            "(?:up\\s*to|max(?:imum)?(?:\\s*amount)?|limit)\\s*[:\\-]?\\s*(?:[₹]|Rs\\.?|INR|[^0-9\\s,.:]{1,2})?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)",
             Pattern.CASE_INSENSITIVE
         )
         val maxMatcher = maxPattern.matcher(text)

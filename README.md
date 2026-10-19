@@ -79,7 +79,9 @@ Debug builds use the standard Android debug keystore. Release builds read the si
 
 3. The build runs `verifyNoInternetPermission` and fails if any library puts `android.permission.INTERNET` into the merged manifest. ML Kit's data-transport library does, so the app's manifest removes it explicitly. `verifyLegalPlaceholders` fails a release build while the privacy contact email is still a placeholder.
 
-4. Before uploading: `./gradlew testDebugUnitTest lintRelease` must pass, and `./gradlew connectedDebugAndroidTest` (with a phone attached) checks the package id, no network permission, backups off, only the launcher activity exported, and database migrations.
+4. **Scan a real Autopay screenshot on the release APK itself** (install it, import from the photo picker, confirm the mandates appear). Shrunk builds can fail where debug builds work; `verifyMlKitKeepRules` guards the ML Kit rules but only a real scan proves it.
+
+5. Before uploading: `./gradlew testDebugUnitTest lintRelease` must pass, and `./gradlew connectedDebugAndroidTest` (with a phone attached) checks the package id, no network permission, backups off, only the launcher activity exported, and database migrations.
 
 ## Security and privacy documents
 

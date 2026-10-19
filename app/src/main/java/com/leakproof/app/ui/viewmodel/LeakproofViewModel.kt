@@ -369,21 +369,41 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
         _importError.value = null
     }
 
+    /** A note for the Review screen, e.g. when only some of the chosen screenshots could be read. */
+    private val _reviewNotice = MutableStateFlow<String?>(null)
+    val reviewNotice: StateFlow<String?> = _reviewNotice.asStateFlow()
+
     // Real ML Kit Screenshot processing. onComplete(true) only when real candidates were found.
     fun processScreenshotUris(uris: List<android.net.Uri>, onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             _isProcessingOcr.value = true
             _importError.value = null
+            _reviewNotice.value = null
             val startedAt = android.os.SystemClock.elapsedRealtime()
             var success = false
             try {
-                val candidates = app.mlKitOcrScanner.processScreenshots(uris)
-                if (candidates.isNotEmpty()) {
+                val report = app.mlKitOcrScanner.processScreenshots(uris)
+                if (report.candidates.isNotEmpty()) {
                     _statementCoverageDays.value = null
-                    _pendingCandidates.value = candidates
+                    _pendingCandidates.value = report.candidates
                     success = true
+                    // Found something, but not from every image: say so rather than hide it
+                    val skipped = report.unreadable + report.noText
+                    if (skipped > 0) {
+                        _reviewNotice.value = "$skipped of ${report.images} screenshot${if (report.images == 1) "" else "s"} couldn't be read. " +
+                            "Check the list on the next screen and import the missing one again if needed."
+                    }
                 } else {
-                    _importError.value = "No autopay mandates were found in the selected screenshots. Try a clearer screenshot of your UPI app's Autopay list."
+                    _importError.value = when {
+                        report.unreadable == report.images ->
+                            "Couldn't open ${if (report.images == 1) "that image" else "those images"}. Pick the screenshot again, or add the payment manually."
+                        report.unreadable + report.noText == report.images ->
+                            "No text could be read in ${if (report.images == 1) "that image" else "those images"}. Use a sharp, full-screen screenshot, or add the payment manually."
+                        else ->
+                            "The text was read, but no Autopay list was recognised. Open Autopay or Mandates in your UPI app, " +
+                                "make sure the rows with \"Up to ₹…\" amounts are on screen, and take the screenshot again. " +
+                                "You can also import a bank statement or add the payment manually."
+                    }
                 }
             } catch (_: Exception) {
                 _importError.value = "Could not read the selected screenshots."

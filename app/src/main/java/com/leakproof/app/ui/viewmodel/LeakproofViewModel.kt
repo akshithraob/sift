@@ -374,6 +374,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _isProcessingOcr.value = true
             _importError.value = null
+            val startedAt = android.os.SystemClock.elapsedRealtime()
             var success = false
             try {
                 val candidates = app.mlKitOcrScanner.processScreenshots(uris)
@@ -387,6 +388,8 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (_: Exception) {
                 _importError.value = "Could not read the selected screenshots."
             } finally {
+                val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
+                if (elapsed < MIN_SCAN_MS) kotlinx.coroutines.delay(MIN_SCAN_MS - elapsed)
                 _isProcessingOcr.value = false
                 onComplete(success)
             }
@@ -398,6 +401,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _isProcessingOcr.value = true
             _importError.value = null
+            val startedAt = android.os.SystemClock.elapsedRealtime()
             var success = false
             try {
                 val imported = app.statementReader.processStatementFile(uri, password)
@@ -411,6 +415,8 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (_: Exception) {
                 _importError.value = "Could not read this statement. Check the file and password."
             } finally {
+                val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
+                if (elapsed < MIN_SCAN_MS) kotlinx.coroutines.delay(MIN_SCAN_MS - elapsed)
                 _isProcessingOcr.value = false
                 onComplete(success)
             }
@@ -441,6 +447,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
 
     private companion object {
         const val RELOCK_GRACE_MS = 30_000L
+        const val MIN_SCAN_MS = 1_400L
         const val MAX_BACKUP_BYTES = 5 * 1024 * 1024
     }
 }

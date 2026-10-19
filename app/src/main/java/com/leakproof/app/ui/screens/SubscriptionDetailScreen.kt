@@ -293,7 +293,7 @@ fun SubscriptionDetailScreen(
                     ) {
                         Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Cancelled")
+                        Text("Mark cancelled")
                     }
                 }
             }

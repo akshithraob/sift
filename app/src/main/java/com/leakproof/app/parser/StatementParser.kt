@@ -118,7 +118,11 @@ class DefaultStatementParser : StatementParser {
         return result
     }
 
-    private val refTokenPattern = Regex("""\b(?:[A-Z]{2,8}[0-9]{6,}[A-Z0-9]*|[0-9]{6,})\b""")
+    // A second (value) date at the start of the narration, e.g. "01/04/26 NEFT CR - ..."
+    private val leadingDates = Regex("""^\s*(?:\d{1,2}[-/.]\d{1,2}[-/.](?:20)?\d{2}\s*)+""")
+
+    // Reference numbers: pure digits, or letters mixed with digits (NEF2607011000, 0402SI007307, 0424ac007559)
+    private val refTokenPattern = Regex("""(?i)\b(?:(?=[A-Z0-9]*\d{4})(?=[A-Z0-9]*[A-Z])[A-Z0-9]{8,}|[0-9]{6,})\b""")
 
     /**
      * Record-based reading for any statement where a transaction starts at a line that begins with its
@@ -145,7 +149,10 @@ class DefaultStatementParser : StatementParser {
                 continue
             }
             val date = datePattern.find(line)?.takeIf { it.range.first <= 3 }
-            val isPeriodLine = date != null && datePattern.findAll(line).count() >= 2 && amountPattern.find(line) == null
+            // A line that is only two dates is a statement period ("01 Jul 2026 - 30 Sep 2026"); a transaction line
+            // with a value date ("01/04/26 01/04/26 NEFT ...") has more text after them
+            val isPeriodLine = date != null && datePattern.findAll(line).count() >= 2 && amountPattern.find(line) == null &&
+                datePattern.replace(line, " ").replace(Regex("""(?i)(to|till|and|from|period)|[-–—·:,]"""), " ").isBlank()
             if (date != null && !isPeriodLine) {
                 records.add(Record(date, mutableListOf(line.substring(date.range.last + 1).trim())))
             } else if (records.isNotEmpty()) {
@@ -187,7 +194,7 @@ class DefaultStatementParser : StatementParser {
                     amounts.sortedByDescending { it.range.first }.forEach { sb.replace(it.range.first, it.range.last + 1, " ") }
                     t = sb.toString()
                 }
-                t.replace(refTokenPattern, " ").replace(Regex("""\s+"""), " ").trim().ifBlank { null }
+                t.replace(refTokenPattern, " ").replace(leadingDates, " ").replace(Regex("""\s+"""), " ").trim().ifBlank { null }
             }.joinToString(" ").ifBlank { "Bank Transaction" }
 
             val finalDirection = direction ?: resolveDirection(amount, balance, prevBalance, chosen.groups[3]?.value, text, null)

@@ -124,7 +124,7 @@ class DefaultRecurringDetector : RecurringDetector {
                 val knownSubscriptionOnCycle = normalizedMerchant in knownSubscriptions && isRegularInterval
 
                 // Two similar debits that are not a week/month/quarter/year apart are just repeat purchases
-                val similarOnCycle = isAmountSimilar && (isRegularInterval || txGroup.size >= 3)
+                val similarOnCycle = isAmountSimilar && isRegularInterval
 
                 // Bills (electricity, broadband, postpaid) repeat on a steady cycle but the amount changes
                 val steadyCycle = txGroup.size >= 3 && isRegularInterval && intervalSpread(intervalsDays) <= MAX_CYCLE_SPREAD_DAYS &&
@@ -215,6 +215,10 @@ class DefaultRecurringDetector : RecurringDetector {
         var clean = rawNarration.uppercase().trim()
 
         clean = clean.replace(Regex("\\([^)]*\\)"), " ")
+
+        // Channel words that start a narration ("ECS/SI DR - X", "UPI DR - X", "SIP DR X", "BILLPAY X")
+        clean = clean.replace(Regex("^(?:(?:ECS|SI|DR|CR|UPI|POS|NACH|NEFT|EMI|SIP|BILLPAY|BILL|ATM|WDL|IMPS|RTGS|ACH|ECOM|AUTOPAY|DEBIT|CREDIT)(?:[ /]+|$))+(?:[-:]+ *)?"), " ")
+        clean = clean.trim()
 
         // 1. Strip UPI IDs (e.g. swiggy@icici, spotify@paytm, user@okaxis)
         clean = clean.replace(Regex("[a-zA-Z0-9._]+@[a-zA-Z0-9.]+"), " ")

@@ -271,6 +271,14 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     // Appearance
+    // The "check the names" guide: shown the first time in each session unless switched off for good
+    private var importGuideAcknowledged = false
+    fun shouldShowImportGuide(): Boolean = !prefs.hideImportGuide && !importGuideAcknowledged
+    fun acknowledgeImportGuide(dontShowAgain: Boolean) {
+        importGuideAcknowledged = true
+        if (dontShowAgain) prefs.hideImportGuide = true
+    }
+
     val themeMode = MutableStateFlow(prefs.themeMode)
 
     fun setThemeMode(mode: Int) {
@@ -460,6 +468,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             _backupResult.value = null
             monthlyBudget.value = 0.0
             themeMode.value = 0
+            importGuideAcknowledged = false
             isAppLockSettingEnabled.value = true
             onComplete()
         }

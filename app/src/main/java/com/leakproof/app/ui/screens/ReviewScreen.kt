@@ -254,6 +254,9 @@ fun ReviewScreen(
                         }
                     }
                 }
+                item(key = "name_check_tip") {
+                    com.leakproof.app.ui.components.NameCheckTip(modifier = Modifier.padding(bottom = 8.dp))
+                }
                 item(key = "review_notice") {
                     val notice by viewModel.reviewNotice.collectAsState()
                     notice?.let {

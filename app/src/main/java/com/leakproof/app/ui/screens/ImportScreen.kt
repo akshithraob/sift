@@ -84,6 +84,15 @@ fun ImportScreen(
     val isProcessingOcr by viewModel.isProcessingOcr.collectAsState()
     val importError by viewModel.importError.collectAsState()
 
+    // Before anything is added: ask the user to check and rename what the parser finds
+    var showGuide by remember { mutableStateOf(viewModel.shouldShowImportGuide()) }
+    if (showGuide) {
+        com.leakproof.app.ui.components.ImportGuideSheet { dontShowAgain ->
+            viewModel.acknowledgeImportGuide(dontShowAgain)
+            showGuide = false
+        }
+    }
+
     // Photo picker for mandate screenshots
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)

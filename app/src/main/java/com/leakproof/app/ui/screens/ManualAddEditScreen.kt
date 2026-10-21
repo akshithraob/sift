@@ -64,6 +64,15 @@ fun ManualAddEditScreen(
         subscriptions.find { it.id == subscriptionId }
     } else null
 
+    // Adding a new one by hand: remind the user that names matter (editing an existing one skips this)
+    var showGuide by remember { mutableStateOf(subscriptionId == null && viewModel.shouldShowImportGuide()) }
+    if (showGuide) {
+        com.leakproof.app.ui.components.ImportGuideSheet { dontShowAgain ->
+            viewModel.acknowledgeImportGuide(dontShowAgain)
+            showGuide = false
+        }
+    }
+
     var merchant by remember { mutableStateOf(existing?.merchant ?: "") }
     var amountText by remember { mutableStateOf(existing?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
     var frequency by remember { mutableStateOf(existing?.frequency ?: "MONTHLY") }

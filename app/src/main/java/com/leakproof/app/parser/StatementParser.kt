@@ -51,7 +51,7 @@ class DefaultStatementParser : StatementParser {
 
     // Amounts always carry two decimals in statements. A trailing Dr/Cr belongs to the amount.
     private val amountPattern = Regex(
-        """(?<![\d.,/\-])(?:₹|Rs\.?|INR)?\s*(\d{1,3}(?:,\d{2,3})*|\d+)\.(\d{2})(?![\d.])(?:[\s,|(]*(Dr|Cr)\b\)?)?""",
+        """(?<![\d.,/])(?<![A-Za-z0-9]-)(?:₹|Rs\.?|INR)?\s*(\d{1,3}(?:,\d{2,3})*|\d+)\.(\d{2})(?![\d.])(?:[\s,|(]*(Dr|Cr)\b\)?)?""",
         RegexOption.IGNORE_CASE
     )
     private val datePattern = Regex(
@@ -66,7 +66,7 @@ class DefaultStatementParser : StatementParser {
         var prevBalance: Double? = null
 
         // Wallet and fintech statements print each transaction as a block of short lines
-        val source = normaliseBlockLayout(lines) ?: lines
+        val source = normaliseBlockLayout(lines.map { fixZeroTokens(it) }) ?: lines.map { fixZeroTokens(it) }
         for (line in joinQuotedLines(source)) {
             val trimmed = line.trim()
             if (trimmed.isBlank() || trimmed.startsWith("#")) continue
@@ -110,8 +110,8 @@ class DefaultStatementParser : StatementParser {
 
         // Statements that spread one transaction over several lines (date and narration first, the
         // amounts a line or two later) defeat the line-by-line pass: read them as records instead
-        val dated = source.count { l -> datePattern.find(l.trim())?.let { it.range.first <= 3 } == true }
-        if (result.size < 3 || (dated >= 3 && result.size < dated / 2)) {
+        val dated = source.count { l -> leadingDate(l.trim()) != null }
+        if (result.size < 3 || dated >= 3) {
             val best = listOf(parseRecordLayout(source), parseDateHeaderLayout(source), parseCardLayout(source))
                 .maxByOrNull { it.size }
             if (best != null && best.size > result.size) return best
@@ -124,6 +124,23 @@ class DefaultStatementParser : StatementParser {
     private val leadingDates = Regex("""^\s*(?:\d{1,2}[-/.]\d{1,2}[-/.](?:20)?\d{2}\s*)+""")
 
     // Reference numbers: pure digits, or letters mixed with digits (NEF2607011000, 0402SI007307, 0424ac007559)
+    // An empty withdrawal or deposit column is printed "0.0" by some banks; make it a normal "0.00" amount
+    private val zeroToken = Regex("""(?<![\d.,])0\.0(?![\d.])""")
+    private fun fixZeroTokens(line: String) = zeroToken.replace(line, "0.00")
+
+    // The sign in front of a figure ("-9,44,949.50" on a loan account balance)
+    private fun signedValue(line: String, m: MatchResult): Double {
+        val i = m.range.first - 1
+        return if (i >= 0 && line[i] == '-') -amountOf(m) else amountOf(m)
+    }
+
+    /** A date that opens the line, optionally after a serial number ("111 22/04/2024 ..."). */
+    private fun leadingDate(line: String): MatchResult? {
+        val m = datePattern.find(line) ?: return null
+        val prefix = line.substring(0, m.range.first)
+        return m.takeIf { prefix.isBlank() || (prefix.length <= 6 && prefix.all { it.isDigit() || it.isWhitespace() }) }
+    }
+
     private val refTokenPattern = Regex("""(?i)\b(?:(?=[A-Z0-9]*\d{4})(?=[A-Z0-9]*[A-Z])[A-Z0-9]{8,}|[0-9]{6,})\b""")
 
     /**
@@ -137,8 +154,6 @@ class DefaultStatementParser : StatementParser {
         val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
         val begin = clean.indexOfFirst { looksLikeHeaderText(it) }.let { if (it < 0) 0 else it }
         val body = clean.drop(begin)
-        val repeated = body.groupingBy { it }.eachCount().filter { (line, n) -> n >= 3 && line.none { it.isDigit() } }.keys
-
         class Record(val date: MatchResult, val parts: MutableList<String>)
         val records = mutableListOf<Record>()
         var prevBalance: Double? = null
@@ -150,7 +165,7 @@ class DefaultStatementParser : StatementParser {
                 }
                 continue
             }
-            val date = datePattern.find(line)?.takeIf { it.range.first <= 3 }
+            val date = leadingDate(line)
             // A line that is only two dates is a statement period ("01 Jul 2026 - 30 Sep 2026"); a transaction line
             // with a value date ("01/04/26 01/04/26 NEFT ...") has more text after them
             val isPeriodLine = date != null && datePattern.findAll(line).count() >= 2 && amountPattern.find(line) == null &&
@@ -162,7 +177,31 @@ class DefaultStatementParser : StatementParser {
             }
         }
 
-        val out = mutableListOf<RawTransactionLine>()
+        // Category labels and page furniture sit under many different narrations; a narration line that
+        // repeats under the same one ("TRANSFER FROM ..." under each EMI) is part of the narration
+        val firstLine = { r: Record ->
+            r.parts.map { datePattern.replace(it, " ").replace(Regex("[()]"), " ").trim() }
+                .firstOrNull { p -> p.any { it.isLetter() } }.orEmpty().uppercase()
+        }
+        val sitsUnder = mutableMapOf<String, MutableSet<String>>()
+        val lastBeforeAmount = mutableMapOf<String, Int>()
+        for (r in records) {
+            r.parts.drop(1).filter { p -> p.none { it.isDigit() } }.forEach { p -> sitsUnder.getOrPut(p) { mutableSetOf() }.add(firstLine(r)) }
+            // A short digit-free line right above the amount line is how category labels are printed
+            val amountAt = r.parts.indexOfLast { amountPattern.find(it) != null }
+            val above = r.parts.getOrNull(amountAt - 1)
+            if (amountAt >= 2 && above != null && above.none { it.isDigit() } && above.split(" ").size <= 3) {
+                lastBeforeAmount[above] = (lastBeforeAmount[above] ?: 0) + 1
+            }
+        }
+        val repeated = (sitsUnder.filter { it.value.size >= 3 }.keys + lastBeforeAmount.filter { it.value >= 3 }.keys).toSet()
+
+        class Row(
+            val date: String, val epochMs: Long, val amount: Double, val balance: Double?, val explicit: Direction?,
+            val marker: String?, val narration: String, val category: String?
+        )
+
+        val rows = mutableListOf<Row>()
         for (rec in records) {
             val amountIdx = rec.parts.indexOfLast { amountPattern.find(it) != null }
             if (amountIdx < 0) continue
@@ -170,7 +209,7 @@ class DefaultStatementParser : StatementParser {
             if (epochMs == 0L) continue
             val amountLine = rec.parts[amountIdx]
             val amounts = amountPattern.findAll(amountLine).toList()
-            val balance = if (amounts.size >= 2) amountOf(amounts.last()) else null
+            val balance = if (amounts.size >= 2) signedValue(amountLine, amounts.last()) else null
             var direction: Direction? = null
             val chosen = when {
                 amounts.size >= 3 -> {
@@ -196,15 +235,39 @@ class DefaultStatementParser : StatementParser {
                     amounts.sortedByDescending { it.range.first }.forEach { sb.replace(it.range.first, it.range.last + 1, " ") }
                     t = sb.toString()
                 }
+                // A value date in brackets, e.g. "(01-Mar-2023)", is not narration
+                t = datePattern.replace(t, " ").replace(Regex("""\(\s*\)"""), " ")
                 t.replace(refTokenPattern, " ").replace(leadingDates, " ").replace(Regex("""\s+"""), " ").trim().ifBlank { null }
-            }.joinToString(" ").ifBlank { "Bank Transaction" }
+            }.joinToString(" ").replace(Regex("^[\\)\\s]+"), "").ifBlank { "Bank Transaction" }
 
             // "ATM26010203763  \u00b7 CASH": the bullet introduces the statement's own category
             val bulletCategory = Regex("""\s[\u00b7\u2022]\s*([A-Za-z][A-Za-z &]*)$""").find(text)
             val narration = if (bulletCategory != null) text.removeRange(bulletCategory.range).trim() else text
-            val finalDirection = direction ?: resolveDirection(amount, balance, prevBalance, chosen.groups[3]?.value, narration, null)
-            out.add(buildTx(rec.date.value, narration.ifBlank { "Bank Transaction" }, amount, finalDirection, epochMs, bulletCategory?.groupValues?.get(1)?.trim()))
-            prevBalance = balance ?: prevBalance
+            rows.add(Row(rec.date.value, epochMs, amount, balance, direction, chosen.groups[3]?.value, narration.ifBlank { "Bank Transaction" },
+                bulletCategory?.groupValues?.get(1)?.trim()))
+        }
+
+        // Some statements list the newest entry first: the running balance only explains an entry's
+        // direction against the entry before it in time, so walk the rows oldest to newest
+        val newestFirst = rows.size >= 2 && rows.first().epochMs > rows.last().epochMs
+        val ordered = if (newestFirst) rows.reversed() else rows
+        val out = mutableListOf<RawTransactionLine>()
+        var firstIsGuess = false
+        for ((i, r) in ordered.withIndex()) {
+            if (i == 0 && r.explicit == null && r.marker == null && prevBalance == null) firstIsGuess = true
+            val dir = r.explicit ?: resolveDirection(r.amount, r.balance, prevBalance, r.marker, r.narration, null)
+            out.add(buildTx(r.date, r.narration, r.amount, dir, r.epochMs, r.category))
+            prevBalance = r.balance ?: prevBalance
+        }
+        // The oldest entry has no earlier balance to compare with. If the same narration appears again,
+        // its direction (worked out from the balances) is a better guide than the wording
+        if (firstIsGuess && out.size >= 3) {
+            val key = { t: String -> t.uppercase().filter { it.isLetter() || it == ' ' }.split(" ").filter { it.isNotEmpty() }.take(2).joinToString(" ") }
+            val first = out[0]
+            val same = out.drop(1).filter { key(it.description) == key(first.description) }
+            if (same.size >= 2 && same.all { it.isDebit == same[0].isDebit } && same[0].isDebit != first.isDebit) {
+                out[0] = buildTx(first.date, first.description, first.amount, if (same[0].isDebit) Direction.DEBIT else Direction.CREDIT, first.dateEpochMs, first.category)
+            }
         }
         return out
     }
@@ -509,7 +572,7 @@ class DefaultStatementParser : StatementParser {
         if (amounts.isEmpty()) return null
 
         // Typical tail: [debit] [credit] balance, or amount balance, or just amount
-        val balance = if (amounts.size >= 2) amountOf(amounts.last()) else null
+        val balance = if (amounts.size >= 2) signedValue(line, amounts.last()) else null
         var direction: Direction? = null
         val chosen = when {
             amounts.size >= 3 -> {

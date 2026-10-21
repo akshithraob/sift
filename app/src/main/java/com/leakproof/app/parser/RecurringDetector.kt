@@ -14,6 +14,13 @@ interface RecurringDetector {
 
 class DefaultRecurringDetector : RecurringDetector {
 
+    /** Standing-instruction wording; "SI-" and "SI/" only count as a word of their own ("SHIVDEEP SI/DHAR" is a name). */
+    private fun isMandate(description: String): Boolean {
+        val upper = description.uppercase()
+        return mandateKeywords.any { k -> k != "SI-" && k != "SI/" && upper.contains(k) } ||
+            Regex("(?<![A-Z0-9] )(?<![A-Z0-9])SI[-/]").containsMatchIn(upper)
+    }
+
     private val mandateKeywords = listOf(
         "UPI-MANDATE", "UPI MANDATE", "AUTOPAY", "AUTO-PAY", "AUTO PAY",
         "ACH D-", "ACH-", "ACH/", "NACH", "SI-", "SI/", "IB SI-",
@@ -75,9 +82,11 @@ class DefaultRecurringDetector : RecurringDetector {
     private val ambiguousBrands = setOf("JIO", "AIRTEL", "APPLE", "AMAZON", "TATA PLAY", "TATAPLAY")
 
     private val billCategories = setOf("utilities", "utility", "bills", "bill", "insurance", "loan emi", "loan", "emi")
-    private val billPattern = Regex("""(?i)\b(electric|electricity|water|gas|broadband|internet|fib(?:er|re)|postpaid|landline|bill|billpay|dth|recharge|maintenance|tax|charges|insurance|premium|emi|loan|fees?)\b""")
+    private val billPattern = Regex("""(?i)\b(electric|electricity|water|gas|broadband|internet|fib(?:er|re)|postpaid|landline|interest|bill|billpay|dth|recharge|maintenance|tax|charges|insurance|premium|emi|loan|fees?)\b""")
 
-    private val cashPattern = Regex("""(?i)\b(atm|cash withdrawal|cash wdl|cash deposit)\b|^cash$""")
+    private val bankChargePattern = Regex("""(?i)(surchg|surcharge|\bchgs?\b|\bgst\b|\bcess\b|bal(ance)? inq|sms (alert|charge)|service charge|min(imum)? bal|\bnfs\b.*\bfee\b|cash txn|st\s*&\s*ec)""")
+
+    private val cashPattern = Regex("""(?i)\b(atm|cash\s+withdrawal|cash\s*wdl|cash\s+deposit)\b|^cash$""")
 
     private val modeWords = setOf("neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach", "rtgs", "dr", "cr")
 
@@ -121,18 +130,18 @@ class DefaultRecurringDetector : RecurringDetector {
         // Debits under ₹10 are verification or test transfers, not subscriptions (unless marked as a mandate)
         val debits = transactions.filter {
             it.isDebit && it.debitAmount > 0.0 &&
-                (it.debitAmount >= MIN_SUBSCRIPTION_AMOUNT || mandateKeywords.any { k -> it.description.contains(k, ignoreCase = true) })
+                (it.debitAmount >= MIN_SUBSCRIPTION_AMOUNT || isMandate(it.description))
         }
         val candidates = mutableListOf<ParsedMandateCandidate>()
 
         // The statement's own category says groceries, shopping, dining...: habits, not subscriptions,
         // unless the narration carries explicit mandate wording (AUTOPAY, SI-, NACH...)
         val relevant = debits.filter { tx ->
-            val mandate = mandateKeywords.any { tx.description.contains(it, ignoreCase = true) }
-            // Cash withdrawals repeat but are never a subscription
-            if (!mandate && cashPattern.containsMatchIn(tx.description)) return@filter false
+            val mandate = isMandate(tx.description)
+            // Cash withdrawals and bank charges repeat but are never a subscription
+            if (!mandate && (cashPattern.containsMatchIn(tx.description) || bankChargePattern.containsMatchIn(tx.description))) return@filter false
             val cat = categoryOf(tx)
-            cat == null || cat !in spendingCategories || mandateKeywords.any { tx.description.contains(it, ignoreCase = true) }
+            cat == null || cat !in spendingCategories || isMandate(tx.description)
         }
 
         // Group by normalized merchant name
@@ -145,11 +154,11 @@ class DefaultRecurringDetector : RecurringDetector {
             if (normalizedMerchant.isBlank() || normalizedMerchant.length < 2) continue
             // Cash withdrawals repeat but are not payments to a subscription
             if (Regex("""(?i)\b(atm|cash withdrawal|cash wdl)\b""").containsMatchIn(normalizedMerchant) &&
-                fullGroup.none { tx -> mandateKeywords.any { tx.description.contains(it, ignoreCase = true) } }
+                fullGroup.none { tx -> isMandate(tx.description) }
             ) continue
 
             val hasMandatePrefix = txGroup.any { tx ->
-                mandateKeywords.any { keyword -> tx.description.contains(keyword, ignoreCase = true) }
+                isMandate(tx.description)
             }
 
             val rail = detectRail(txGroup.first().description)
@@ -184,7 +193,9 @@ class DefaultRecurringDetector : RecurringDetector {
                     else -> Frequency.MONTHLY
                 }
 
-                val isRegularInterval = avgInterval in 5.0..9.0 ||
+                // A weekly subscription is paid every 7 days, not "about a week": ask for a tight rhythm
+                val weeklyOk = avgInterval in 5.0..9.0 && txGroup.size >= 4 && intervalSpread(intervalsDays) <= 1.5
+                val isRegularInterval = weeklyOk ||
                         avgInterval in 24.0..36.0 ||
                         avgInterval in 75.0..105.0 ||
                         avgInterval in 340.0..390.0
@@ -210,6 +221,8 @@ class DefaultRecurringDetector : RecurringDetector {
                     val avgAmount = Math.round(amounts.average() * 100.0) / 100.0
                     val confidence = when {
                         variableBill -> Confidence.MEDIUM
+                        // Two payments are thin evidence unless the narration names a mandate or a known service
+                        txGroup.size == 2 && !hasMandatePrefix && !knownSubscriptionOnCycle -> Confidence.MEDIUM
                         hasMandatePrefix && isAmountSimilar -> Confidence.HIGH
                         isAmountSimilar && isRegularInterval -> Confidence.HIGH
                         hasMandatePrefix -> Confidence.HIGH
@@ -287,12 +300,18 @@ class DefaultRecurringDetector : RecurringDetector {
     }
 
     override fun normalizeMerchantName(rawNarration: String): String {
+        val name = normalizeName(rawNarration, stripChannel = true)
+        // "EMI 38810601 CHQ S38810601/1-1": once the channel word is gone only "Chq" is left; keep it
+        return if (name.length <= 4) normalizeName(rawNarration, stripChannel = false).ifBlank { name } else name
+    }
+
+    private fun normalizeName(rawNarration: String, stripChannel: Boolean): String {
         var clean = cutCategorySuffix(rawNarration).uppercase().trim()
 
         clean = clean.replace(Regex("\\([^)]*\\)"), " ")
 
         // Channel words that start a narration ("ECS/SI DR - X", "UPI DR - X", "SIP DR X", "BILLPAY X")
-        clean = clean.replace(Regex("^(?:(?:ECS|SI|DR|CR|UPI|POS|NACH|NEFT|EMI|SIP|BILLPAY|BILL|ATM|WDL|IMPS|RTGS|ACH|ECOM|AUTOPAY|AUTODEBIT|DEBIT|CREDIT|RECURRING)(?:[ /]+|$))+(?:[-:]+ *)?"), " ")
+        if (stripChannel) clean = clean.replace(Regex("^(?:(?:ECS|SI|DR|CR|UPI|POS|NACH|NEFT|EMI|SIP|BILLPAY|BILL|ATM|WDL|IMPS|RTGS|ACH|ECOM|AUTOPAY|AUTODEBIT|DEBIT|CREDIT|RECURRING)(?:[ /]+|$))+(?:[-:]+ *)?"), " ")
         clean = clean.trim()
 
         // 1. Strip UPI IDs (e.g. swiggy@icici, spotify@paytm, user@okaxis)

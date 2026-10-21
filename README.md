@@ -11,6 +11,11 @@
 - **Subscriptions and debt together**: EMIs and loans (with outstanding balance, interest and a debt-free plan), SIPs and insurance sit beside subscriptions, with a monthly split.
 - **Health score**, a **12-month forecast**, a payment **calendar**, a monthly **budget cap** and a **free-trial tracker** with reminders.
 - **Re-import diff**: importing again updates what changed instead of duplicating.
+- **Annual-renewal radar**: yearly payments coming up in the next 90 days, with a heads-up notification a month and a week before.
+- **Year in review**: what everything adds up to, your priciest subscription, what you saved by cancelling and your busiest month. The shareable summary has totals only.
+- **Home-screen widget**: this month's total and the next renewal. It stays blank until you turn on "Show amounts on the widget" in Settings, because a home screen is visible to anyone holding the phone.
+- **Share to Leakproof**: share screenshots, a statement PDF or a CSV from any app (Files, WhatsApp, a browser) straight into the import. The app lock still comes first.
+- **Stronger overlap detection**: bundles that already include other services (Apple One, Prime, YouTube Premium), several plans of one service, near-duplicate names, and more categories (gaming, VPN, design, wellness).
 - **Cancel guides**: Leakproof cannot revoke mandates itself, so it deep-links to your UPI app or https://upihelp.npci.org.in and shows step-by-step guides from the bundled `merchants.json`.
 - **Trust Center**: shows, from your own phone, that this copy has no internet permission, no cloud backup, and which certificate signed it, plus exactly what is and is not stored.
 - Light, dark and system themes; encrypted backup and restore; DPDP Act consent and a built-in privacy policy.

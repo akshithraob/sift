@@ -31,15 +31,21 @@ class StatementReader(
     /** Recurring payments found, and the period the statement covered (null if no dated rows). */
     data class StatementImport(
         val candidates: List<ParsedMandateCandidate>,
-        val coverageDays: Int?
+        val coverageDays: Int?,
+        /** How many lines of text the file gave, and how many transactions were read from them. */
+        val textLines: Int = 0,
+        val transactions: Int = 0
     )
+
+    /** Why a file could not be read, so the user is told the real reason. */
+    class StatementReadException(val reason: Reason) : Exception(reason.name) {
+        enum class Reason { UNREADABLE, PASSWORD_NEEDED, NOT_A_PDF }
+    }
 
     suspend fun processStatementFile(uri: Uri, password: String? = null): StatementImport = withContext(Dispatchers.IO) {
         val tempFile = createTempCacheFile(uri)
         try {
-            if (tempFile == null || !tempFile.exists()) {
-                return@withContext StatementImport(emptyList(), null)
-            }
+            if (tempFile == null || !tempFile.exists()) throw StatementReadException(StatementReadException.Reason.UNREADABLE)
 
             val filename = uri.lastPathSegment ?: tempFile.name
             val isPdf = filename.endsWith(".pdf", ignoreCase = true) || hasPdfHeader(tempFile)
@@ -61,7 +67,7 @@ class StatementReader(
             val coverageDays = if (dates.size >= 2) ((dates.max() - dates.min()) / (24L * 3600 * 1000)).toInt() + 1 else null
 
             // Core Privacy Principle: raw transaction lines are discarded and never kept or stored
-            StatementImport(candidates, coverageDays)
+            StatementImport(candidates, coverageDays, lines.size, rawTransactions.size)
         } finally {
             // Delete temp file immediately after processing
             tempFile?.delete()
@@ -80,8 +86,10 @@ class StatementReader(
             val stripper = PDFTextStripper()
             val text = stripper.getText(document)
             text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        } catch (e: com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException) {
+            throw StatementReadException(StatementReadException.Reason.PASSWORD_NEEDED)
         } catch (_: Exception) {
-            emptyList()
+            throw StatementReadException(StatementReadException.Reason.NOT_A_PDF)
         } finally {
             try {
                 document?.close()

@@ -39,6 +39,12 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
     val allSubscriptions: StateFlow<List<SubscriptionEntity>> = repository.getAllSubscriptions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    init {
+        viewModelScope.launch {
+            allSubscriptions.collect { com.leakproof.app.widget.LeakproofWidgetProvider.refresh(getApplication()) }
+        }
+    }
+
     // App Lock state
     private val _isAppLocked = MutableStateFlow(prefs.isAppLockEnabled)
     val isAppLocked: StateFlow<Boolean> = _isAppLocked.asStateFlow()
@@ -279,6 +285,40 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
         if (dontShowAgain) prefs.hideImportGuide = true
     }
 
+    // Home-screen widget: amounts stay hidden until the user turns them on
+    val widgetShowDetails = MutableStateFlow(prefs.widgetShowDetails)
+    fun setWidgetShowDetails(show: Boolean) {
+        prefs.widgetShowDetails = show
+        widgetShowDetails.value = show
+        com.leakproof.app.widget.LeakproofWidgetProvider.refresh(getApplication())
+    }
+
+    // Files shared into the app from another app ("Share > Leakproof")
+    enum class SharedKind { IMAGES, PDF, CSV }
+    data class SharedImport(val uris: List<android.net.Uri>, val kind: SharedKind)
+
+    private val _pendingShare = MutableStateFlow<SharedImport?>(null)
+    val pendingShare: StateFlow<SharedImport?> = _pendingShare.asStateFlow()
+    fun hasPendingShare(): Boolean = _pendingShare.value != null
+    fun takePendingShare(): SharedImport? = _pendingShare.value.also { _pendingShare.value = null }
+
+    /** Only content:// streams are accepted, at most five images; the first PDF or CSV wins. */
+    fun receiveSharedFiles(uris: List<android.net.Uri>, mimeType: String?) {
+        val resolver = getApplication<Application>().contentResolver
+        val safe = uris.filter { it.scheme == "content" }.take(5)
+        if (safe.isEmpty()) return
+        fun typeOf(u: android.net.Uri) = (resolver.getType(u) ?: mimeType).orEmpty().lowercase()
+        val first = typeOf(safe.first())
+        val share = when {
+            first.startsWith("image/") -> SharedImport(safe.filter { typeOf(it).startsWith("image/") }, SharedKind.IMAGES)
+            first == "application/pdf" -> SharedImport(listOf(safe.first()), SharedKind.PDF)
+            first.contains("csv") || safe.first().lastPathSegment.orEmpty().endsWith(".csv", ignoreCase = true) ->
+                SharedImport(listOf(safe.first()), SharedKind.CSV)
+            else -> null
+        }
+        _pendingShare.value = share
+    }
+
     val themeMode = MutableStateFlow(prefs.themeMode)
 
     fun setThemeMode(mode: Int) {
@@ -438,10 +478,26 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
                     _pendingCandidates.value = imported.candidates
                     success = true
                 } else {
-                    _importError.value = "No recurring payments were detected in this statement."
+                    _importError.value = when {
+                        imported.textLines == 0 ->
+                            "No text could be read in this file. If it is a scan or a photo of a statement, import it as a screenshot instead."
+                        imported.transactions == 0 ->
+                            "The file was read, but no table of transactions was recognised. Try the CSV version of the statement, or send it to us as a sample."
+                        else ->
+                            "Read ${imported.transactions} transactions, but none repeat on a regular cycle. Try a longer period, at least two or three months."
+                    }
+                }
+            } catch (e: com.leakproof.app.data.statement.StatementReader.StatementReadException) {
+                _importError.value = when (e.reason) {
+                    com.leakproof.app.data.statement.StatementReader.StatementReadException.Reason.PASSWORD_NEEDED ->
+                        "This PDF is password-protected, or the password was wrong. Banks often use your date of birth or PAN."
+                    com.leakproof.app.data.statement.StatementReader.StatementReadException.Reason.NOT_A_PDF ->
+                        "That file could not be opened as a PDF. Download the statement again and retry."
+                    com.leakproof.app.data.statement.StatementReader.StatementReadException.Reason.UNREADABLE ->
+                        "Couldn't open that file. Pick it again, or share it from the Files app."
                 }
             } catch (_: Exception) {
-                _importError.value = "Could not read this statement. Check the file and password."
+                _importError.value = "Could not read this statement. Check the file and try again."
             } finally {
                 val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
                 if (elapsed < MIN_SCAN_MS) kotlinx.coroutines.delay(MIN_SCAN_MS - elapsed)
@@ -469,6 +525,8 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
             monthlyBudget.value = 0.0
             themeMode.value = 0
             importGuideAcknowledged = false
+            widgetShowDetails.value = false
+            _pendingShare.value = null
             isAppLockSettingEnabled.value = true
             onComplete()
         }

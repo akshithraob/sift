@@ -20,6 +20,7 @@ import com.leakproof.app.ui.screens.ReviewScreen
 import com.leakproof.app.ui.screens.SettingsScreen
 import com.leakproof.app.ui.screens.SubscriptionDetailScreen
 import com.leakproof.app.ui.screens.TrustCenterScreen
+import com.leakproof.app.ui.screens.YearInReviewScreen
 import com.leakproof.app.ui.viewmodel.LeakproofViewModel
 
 object Destinations {
@@ -36,6 +37,7 @@ object Destinations {
     const val SETTINGS = "settings"
     const val CALENDAR = "calendar"
     const val TRUST = "trust"
+    const val YEAR = "year_in_review"
 
     fun detail(id: Long) = "detail/$id"
     fun edit(id: Long) = "manual_edit/$id"
@@ -56,6 +58,14 @@ fun LeakproofNavGraph(
         !isOnboardingCompleted -> Destinations.ONBOARDING
         isAppLocked -> Destinations.LOCK
         else -> Destinations.DASHBOARD
+    }
+
+    // A file shared into the app waits until consent, onboarding and the lock are out of the way
+    val pendingShare by viewModel.pendingShare.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(pendingShare, isConsentGiven, isOnboardingCompleted, isAppLocked) {
+        if (pendingShare != null && isConsentGiven && isOnboardingCompleted && !isAppLocked) {
+            navController.navigate(Destinations.IMPORT) { launchSingleTop = true }
+        }
     }
 
     NavHost(
@@ -112,7 +122,8 @@ fun LeakproofNavGraph(
                 onNavigateToManualAdd = { navController.navigate(Destinations.MANUAL_ADD) },
                 onNavigateToDetail = { id -> navController.navigate(Destinations.detail(id)) },
                 onNavigateToSettings = { navController.navigate(Destinations.SETTINGS) },
-                onNavigateToCalendar = { navController.navigate(Destinations.CALENDAR) }
+                onNavigateToCalendar = { navController.navigate(Destinations.CALENDAR) },
+                onNavigateToYear = { navController.navigate(Destinations.YEAR) }
             )
         }
 
@@ -179,6 +190,10 @@ fun LeakproofNavGraph(
                     navController.navigate(Destinations.detail(id))
                 }
             )
+        }
+
+        composable(Destinations.YEAR) {
+            YearInReviewScreen(viewModel = viewModel, onNavigateBack = { navController.popBackStack() })
         }
 
         composable(Destinations.TRUST) {

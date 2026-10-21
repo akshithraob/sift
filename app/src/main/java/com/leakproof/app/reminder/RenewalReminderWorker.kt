@@ -48,6 +48,20 @@ class RenewalReminderWorker(
                 post(NOTIFICATION_RENEWALS, title, renewals.joinToString(", ") { "${it.merchant} (${CurrencyFormatter.format(it.amount)})" })
             }
 
+            // Yearly charges are the easy ones to forget: a heads-up a month ahead and again a week ahead
+            for (days in listOf(YEARLY_HEADS_UP_DAYS, YEARLY_LAST_CALL_DAYS)) {
+                val yearly = dao.getActiveRenewingBetween(startOfDay(days), startOfDay(days + 1))
+                    .filter { it.frequency.equals("YEARLY", ignoreCase = true) }
+                if (yearly.isNotEmpty()) {
+                    val label = if (days >= 28) "a month" else "$days days"
+                    post(
+                        NOTIFICATION_YEARLY + days,
+                        if (yearly.size == 1) "A yearly payment renews in $label" else "${yearly.size} yearly payments renew in $label",
+                        yearly.joinToString(", ") { "${it.merchant} (${CurrencyFormatter.format(it.amount)})" } + ". Keep it or cancel it?"
+                    )
+                }
+            }
+
             val trials = dao.getActiveTrialsEndingBetween(startOfDay(0), startOfDay(2))
             if (trials.isNotEmpty()) {
                 val title = if (trials.size == 1) "A free trial is ending" else "${trials.size} free trials are ending"
@@ -61,6 +75,7 @@ class RenewalReminderWorker(
         }
 
         nudgeToReimport()
+        com.leakproof.app.widget.LeakproofWidgetProvider.refresh(context)
         return Result.success()
     }
 
@@ -124,6 +139,9 @@ class RenewalReminderWorker(
 
     companion object {
         const val DAYS_BEFORE = 2
+        const val YEARLY_HEADS_UP_DAYS = 30
+        const val YEARLY_LAST_CALL_DAYS = 7
+        private const val NOTIFICATION_YEARLY = 1100
         private const val REIMPORT_AFTER_MS = 30L * 24 * 3600 * 1000
         private const val CHANNEL_ID = "renewal_reminders"
         private const val NOTIFICATION_RENEWALS = 1001

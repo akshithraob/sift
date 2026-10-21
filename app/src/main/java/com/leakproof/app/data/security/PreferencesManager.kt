@@ -14,6 +14,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_CONSENT_AT_MS = "key_consent_at_ms"
         private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_HIDE_IMPORT_GUIDE = "key_hide_import_guide"
+        private const val KEY_WIDGET_DETAILS = "key_widget_details"
         private const val KEY_MONTHLY_BUDGET = "key_monthly_budget"
         private const val KEY_LAST_IMPORT_MS = "key_last_import_ms"
         private const val KEY_LAST_REIMPORT_NUDGE_MS = "key_last_reimport_nudge_ms"
@@ -44,6 +45,11 @@ class PreferencesManager(context: Context) {
     var hideImportGuide: Boolean
         get() = prefs.getBoolean(KEY_HIDE_IMPORT_GUIDE, false)
         set(value) = prefs.edit().putBoolean(KEY_HIDE_IMPORT_GUIDE, value).apply()
+
+    /** The home-screen widget shows amounts and names only after the user opts in (off by default). */
+    var widgetShowDetails: Boolean
+        get() = prefs.getBoolean(KEY_WIDGET_DETAILS, false)
+        set(value) = prefs.edit().putBoolean(KEY_WIDGET_DETAILS, value).apply()
 
     /** 0 follows the system, 1 light, 2 dark. */
     var themeMode: Int

@@ -1,5 +1,6 @@
 package com.leakproof.app.ui.screens
 
+import androidx.compose.runtime.LaunchedEffect
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -85,11 +86,27 @@ fun ImportScreen(
     val importError by viewModel.importError.collectAsState()
 
     // Before anything is added: ask the user to check and rename what the parser finds
-    var showGuide by remember { mutableStateOf(viewModel.shouldShowImportGuide()) }
+    var showGuide by remember { mutableStateOf(viewModel.shouldShowImportGuide() && !viewModel.hasPendingShare()) }
     if (showGuide) {
         com.leakproof.app.ui.components.ImportGuideSheet { dontShowAgain ->
             viewModel.acknowledgeImportGuide(dontShowAgain)
             showGuide = false
+        }
+    }
+
+    // A file shared from another app: read it straight away, as if it had been picked here
+    LaunchedEffect(Unit) {
+        viewModel.takePendingShare()?.let { share ->
+            when (share.kind) {
+                com.leakproof.app.ui.viewmodel.LeakproofViewModel.SharedKind.IMAGES ->
+                    viewModel.processScreenshotUris(share.uris) { ok -> if (ok) onNavigateToReview() }
+                com.leakproof.app.ui.viewmodel.LeakproofViewModel.SharedKind.CSV ->
+                    viewModel.processStatementUri(share.uris.first()) { ok -> if (ok) onNavigateToReview() }
+                com.leakproof.app.ui.viewmodel.LeakproofViewModel.SharedKind.PDF -> {
+                    selectedFileUri = share.uris.first()
+                    showPasswordDialog = true
+                }
+            }
         }
     }
 

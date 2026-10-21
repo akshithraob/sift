@@ -1,5 +1,6 @@
 package com.leakproof.app.ui.screens
 
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CalendarMonth
 import com.leakproof.app.ui.components.rememberHaptics
 import com.leakproof.app.ui.components.pressScale
@@ -115,7 +116,8 @@ fun DashboardScreen(
     onNavigateToManualAdd: () -> Unit,
     onNavigateToDetail: (Long) -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToCalendar: () -> Unit = {}
+    onNavigateToCalendar: () -> Unit = {},
+    onNavigateToYear: () -> Unit = {}
 ) {
     val subscriptions by viewModel.allSubscriptions.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -131,6 +133,7 @@ fun DashboardScreen(
     val kindSplit = remember(subscriptions) { KindBreakdown.monthlyByKind(subscriptions) }
     val forecast = remember(subscriptions) { Schedule.forecast(subscriptions) }
     val emis = active.filter { it.kind == "EMI" }
+    val radar = remember(subscriptions) { com.leakproof.app.insights.RenewalRadar.upcoming(subscriptions) }
 
     val comingUp = active
         .filter { Trials.daysUntil(it.nextDateEpochMs) in 0..7 }
@@ -197,6 +200,30 @@ fun DashboardScreen(
         ) {
             item { Hero(totalMonthly = totalMonthly, activeCount = active.size, budget = budget, health = health) }
 
+            if (active.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    com.leakproof.app.ui.components.AppCard(
+                        modifier = Modifier.fillMaxWidth().clickable(onClick = onNavigateToYear).testTag("year_in_review_tile")
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(Spacing.card),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Your year in review", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                                Text(
+                                    "What it all adds up to, what you saved, your busiest month",
+                                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
             if (kindSplit.size > 1) {
                 item {
                     Spacer(modifier = Modifier.height(14.dp))
@@ -214,6 +241,13 @@ fun DashboardScreen(
                     }
                 }
                 LeaksCard(leaks)
+            }
+
+            if (radar.isNotEmpty()) {
+                item {
+                    SectionTitle("Annual renewals ahead")
+                    com.leakproof.app.ui.components.AnnualRadarCard(radar, onNavigateToDetail)
+                }
             }
 
             if (forecast.any { it.total > 0 }) {
@@ -416,7 +450,7 @@ private fun Hero(totalMonthly: Double, activeCount: Int, budget: BudgetStatus, h
 private fun Leak.icon(): ImageVector = when (kind) {
     LeakKind.OVER_BUDGET, LeakKind.NEAR_BUDGET, LeakKind.HIGH_INTEREST -> Icons.Default.TrendingUp
     LeakKind.TRIAL, LeakKind.STALE_CHARGE -> Icons.Default.HourglassBottom
-    LeakKind.DUPLICATE, LeakKind.OVERLAP -> Icons.Default.ContentCopy
+    LeakKind.DUPLICATE, LeakKind.BUNDLE, LeakKind.SAME_SERVICE, LeakKind.OVERLAP -> Icons.Default.ContentCopy
     LeakKind.MANDATE_LIMIT -> Icons.Default.Warning
 }
 

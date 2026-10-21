@@ -339,6 +339,50 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Home-screen widget
+            SettingsSectionHeader(title = "HOME-SCREEN WIDGET")
+            val widgetDetails by viewModel.widgetShowDetails.collectAsState()
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                border = com.leakproof.app.ui.components.appCardBorder(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text("Show amounts on the widget", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            "Add the Leakproof widget from your home screen's widget list. It stays blank until you turn this on, " +
+                                "because anyone who sees your home screen could read it.",
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = widgetDetails,
+                        onCheckedChange = { viewModel.setWidgetShowDetails(it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = BrandPrimary, checkedTrackColor = BrandPrimary.copy(alpha = 0.4f)),
+                        modifier = Modifier.testTag("toggle_widget_details")
+                    )
+                }
+                val widgetManager = remember { android.appwidget.AppWidgetManager.getInstance(context) }
+                if (widgetManager.isRequestPinAppWidgetSupported) {
+                    OutlinedButton(
+                        onClick = {
+                            widgetManager.requestPinAppWidget(
+                                android.content.ComponentName(context, com.leakproof.app.widget.LeakproofWidgetProvider::class.java), null, null
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag("add_widget_button")
+                    ) { Text("Add the widget to your home screen") }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Budget Section
             SettingsSectionHeader(title = "BUDGET")
 

@@ -177,24 +177,18 @@ class DefaultStatementParser : StatementParser {
             }
         }
 
-        // Category labels and page furniture sit under many different narrations; a narration line that
-        // repeats under the same one ("TRANSFER FROM ..." under each EMI) is part of the narration
-        val firstLine = { r: Record ->
-            r.parts.map { datePattern.replace(it, " ").replace(Regex("[()]"), " ").trim() }
-                .firstOrNull { p -> p.any { it.isLetter() } }.orEmpty().uppercase()
+        // Some statements print a category label on the line above the amount ("Subscriptions", "Housing").
+        // When almost every entry has one there, that line is a label; otherwise a short line up there is
+        // just a wrapped word of the narration ("PREMIUM") and must stay.
+        fun lineAboveAmount(r: Record): String? {
+            val at = r.parts.indexOfLast { amountPattern.find(it) != null }
+            return if (at >= 2) r.parts[at - 1].takeIf { p -> p.none { it.isDigit() } && p.split(" ").size <= 3 } else null
         }
-        val sitsUnder = mutableMapOf<String, MutableSet<String>>()
-        val lastBeforeAmount = mutableMapOf<String, Int>()
-        for (r in records) {
-            r.parts.drop(1).filter { p -> p.none { it.isDigit() } }.forEach { p -> sitsUnder.getOrPut(p) { mutableSetOf() }.add(firstLine(r)) }
-            // A short digit-free line right above the amount line is how category labels are printed
-            val amountAt = r.parts.indexOfLast { amountPattern.find(it) != null }
-            val above = r.parts.getOrNull(amountAt - 1)
-            if (amountAt >= 2 && above != null && above.none { it.isDigit() } && above.split(" ").size <= 3) {
-                lastBeforeAmount[above] = (lastBeforeAmount[above] ?: 0) + 1
-            }
-        }
-        val repeated = (sitsUnder.filter { it.value.size >= 3 }.keys + lastBeforeAmount.filter { it.value >= 3 }.keys).toSet()
+        val withLine = records.count { lineAboveAmount(it) != null }
+        // A category column has several different labels; one repeated word is a wrapped narration
+        val labelLayout = records.isNotEmpty() && withLine >= records.size * 0.8 &&
+            records.mapNotNull { lineAboveAmount(it) }.toSet().size >= 3
+        val repeated: Set<String> = if (labelLayout) records.mapNotNull { lineAboveAmount(it) }.toSet() else emptySet()
 
         class Row(
             val date: String, val epochMs: Long, val amount: Double, val balance: Double?, val explicit: Direction?,

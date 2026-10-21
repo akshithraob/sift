@@ -6,7 +6,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.isSystemInDarkTheme
 import android.graphics.Color
 import androidx.activity.SystemBarStyle
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import androidx.core.content.IntentCompat
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -32,9 +35,29 @@ class MainActivity : FragmentActivity() {
         viewModel.onAppForegrounded()
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShare(intent)
+    }
+
+    /** "Share > Leakproof" from another app: hand the files over; the app lock still comes first. */
+    private fun handleShare(intent: Intent?) {
+        val action = intent?.action
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
+        val uris = if (action == Intent.ACTION_SEND) {
+            listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+        } else {
+            IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+        }
+        if (uris.isNotEmpty()) viewModel.receiveSharedFiles(uris, intent.type)
+        intent.action = null // do not handle the same share again after a rotation
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) handleShare(intent)
 
         // Strict Security: Block screenshots and screen recording in release builds
         // Note: In debug builds on the browser streaming emulator, FLAG_SECURE blacks out the canvas

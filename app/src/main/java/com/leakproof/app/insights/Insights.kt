@@ -30,64 +30,184 @@ internal fun normalizeName(name: String): String =
 
 // ---------------------------------------------------------------- Overlaps
 
-enum class OverlapKind { DUPLICATE, OVERLAP }
+enum class OverlapKind { DUPLICATE, BUNDLE, SAME_SERVICE, OVERLAP }
 
 data class OverlapInsight(
     val kind: OverlapKind,
     val label: String,
     val subscriptionIds: List<Long>,
     val merchants: List<String>,
-    val monthlyTotal: Double
+    /** What the listed services cost together per month (for a bundle: what the redundant ones cost). */
+    val monthlyTotal: Double,
+    /** For a bundle: the plan that already includes the others. */
+    val bundleName: String? = null
 ) {
     val title: String
         get() = when (kind) {
             OverlapKind.DUPLICATE -> "${merchants.first()} appears ${subscriptionIds.size} times"
+            OverlapKind.BUNDLE -> "$bundleName already includes ${joinNames(merchants)}"
+            OverlapKind.SAME_SERVICE -> "You pay for ${merchants.size} $label plans"
             OverlapKind.OVERLAP -> "You pay for ${merchants.size} ${label.lowercase()} services"
         }
+
+    private fun joinNames(names: List<String>) = when (names.size) {
+        1 -> names[0]
+        2 -> "${names[0]} and ${names[1]}"
+        else -> names.dropLast(1).joinToString(", ") + " and " + names.last()
+    }
 }
 
 object OverlapDetector {
 
+    /** Different services that do the same job. Paying for two of the same group is worth a look. */
     private val groups: Map<String, List<String>> = linkedMapOf(
         "Music streaming" to listOf("spotify", "apple music", "youtube music", "youtube premium", "gaana", "jiosaavn", "wynk", "amazon music"),
-        "Video streaming" to listOf("netflix", "hotstar", "prime video", "amazon prime", "sony liv", "sonyliv", "zee5", "jiocinema", "apple tv", "mx player"),
-        "Cloud storage" to listOf("google one", "icloud", "dropbox", "onedrive"),
+        "Video streaming" to listOf("netflix", "hotstar", "prime video", "amazon prime", "sony liv", "sonyliv", "zee5", "jiocinema", "apple tv", "mx player", "discovery+", "lionsgate", "hoichoi", "sun nxt", "sunnxt"),
+        "Cloud storage" to listOf("google one", "icloud", "dropbox", "onedrive", "mega"),
         "AI assistant" to listOf("claude", "anthropic", "chatgpt", "openai", "gemini", "perplexity", "copilot"),
-        "News & reading" to listOf("the hindu", "times prime", "economist", "hindustan times", "indian express", "kindle unlimited", "bloomberg", "medium"),
-        "Fitness" to listOf("cult.fit", "cult fit", "curefit", "healthifyme", "fitbit", "strava"),
+        "News & reading" to listOf("the hindu", "times prime", "economist", "hindustan times", "indian express", "kindle unlimited", "bloomberg", "medium", "wall street journal", "wsj", "financial times"),
+        "Audio & books" to listOf("audible", "storytel", "pocket fm", "kuku fm", "kindle unlimited"),
+        "Fitness" to listOf("cult.fit", "cult fit", "curefit", "healthifyme", "fitbit", "strava", "apple fitness"),
+        "Meditation & wellness" to listOf("headspace", "calm", "wysa", "insight timer"),
         "Food delivery membership" to listOf("swiggy one", "zomato gold", "eatsure"),
-        "Online learning" to listOf("coursera", "udemy", "unacademy", "byju", "duolingo", "skillshare")
+        "Online learning" to listOf("coursera", "udemy", "unacademy", "byju", "duolingo", "skillshare", "masterclass", "linkedin learning", "chess.com"),
+        "Gaming" to listOf("xbox game pass", "game pass", "playstation plus", "ps plus", "nintendo switch online", "ea play", "steam", "discord nitro", "geforce now"),
+        "VPN" to listOf("nordvpn", "expressvpn", "surfshark", "windscribe", "protonvpn", "proton vpn", "cyberghost"),
+        "Design & creative" to listOf("canva", "adobe", "figma", "picsart", "lightroom", "photoshop"),
+        "Notes & productivity" to listOf("notion", "evernote", "todoist", "obsidian", "microsoft 365", "office 365", "google workspace"),
+        "Writing tools" to listOf("grammarly", "quillbot", "prowritingaid"),
+        "Password manager" to listOf("1password", "lastpass", "bitwarden", "dashlane")
     )
+
+    /** One service, several plans: paying for two of these is almost always one too many. */
+    private val families: Map<String, List<String>> = linkedMapOf(
+        "Spotify" to listOf("spotify"),
+        "Netflix" to listOf("netflix"),
+        "Hotstar" to listOf("hotstar", "jiohotstar"),
+        "YouTube" to listOf("youtube premium", "youtube music"),
+        "Amazon Prime" to listOf("amazon prime", "prime video", "prime lite"),
+        "Google One" to listOf("google one"),
+        "Microsoft 365" to listOf("microsoft 365", "office 365"),
+        "Xbox Game Pass" to listOf("xbox game pass", "game pass"),
+        "Sony LIV" to listOf("sony liv", "sonyliv"),
+        "Audible" to listOf("audible")
+    )
+
+    /** Names the parser or the user gives when the real service is unknown; two of them are not duplicates. */
+    private val placeholderNames = setOf("subscriptionviapaytm", "autopaysubscription", "upiautopaymandate", "bankmandate", "banktransaction", "unknown", "googleplay")
+
+    /** A plan that already contains other services. Paying for both is paying twice. */
+    private class Bundle(val name: String, val names: List<String>, val includes: List<String>)
+
+    private val bundles = listOf(
+        Bundle("Apple One", listOf("apple one"), listOf("apple music", "icloud", "apple tv", "apple arcade", "apple fitness")),
+        Bundle("Amazon Prime", listOf("amazon prime", "prime lite"), listOf("prime video", "amazon music")),
+        Bundle("YouTube Premium", listOf("youtube premium"), listOf("youtube music")),
+        Bundle("Microsoft 365", listOf("microsoft 365", "office 365"), listOf("onedrive")),
+        Bundle("Xbox Game Pass Ultimate", listOf("game pass ultimate"), listOf("ea play", "xbox live", "game pass core", "pc game pass"))
+    )
+
+    private fun matches(sub: SubscriptionEntity, keywords: List<String>): Boolean {
+        val lower = sub.merchant.lowercase()
+        return keywords.any { lower.contains(it) }
+    }
+
+    private fun editDistance(a: String, b: String): Int {
+        if (a == b) return 0
+        val prev = IntArray(b.length + 1) { it }
+        val cur = IntArray(b.length + 1)
+        for (i in 1..a.length) {
+            cur[0] = i
+            for (j in 1..b.length) {
+                cur[j] = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + if (a[i - 1] == b[j - 1]) 0 else 1)
+            }
+            System.arraycopy(cur, 0, prev, 0, prev.size)
+        }
+        return prev[b.length]
+    }
+
+    /** The same service seen twice: same name, a one-letter slip, or one name contained in the other. */
+    private fun sameName(a: String, b: String): Boolean {
+        if (a.isBlank() || b.isBlank()) return false
+        if (a == b) return true
+        if (minOf(a.length, b.length) >= 6 && editDistance(a, b) <= 1) return true
+        val (short, long) = if (a.length <= b.length) a to b else b to a
+        return short.length >= 5 && long.contains(short)
+    }
 
     fun detect(subscriptions: List<SubscriptionEntity>): List<OverlapInsight> {
         // Two EMIs or two SIPs are not "paying twice": only subscriptions can overlap
         val active = subscriptions.filter { it.status == "ACTIVE" && it.kind == "SUBSCRIPTION" }
         val result = mutableListOf<OverlapInsight>()
+        val claimed = mutableListOf<Set<Long>>()
 
-        // Exactly the same service tracked more than once (e.g. mandates created in two UPI apps)
-        active.groupBy { normalizeName(it.merchant) }
-            .filter { it.key.isNotBlank() && it.value.size >= 2 }
-            .forEach { (_, dupes) ->
-                result.add(
-                    OverlapInsight(
-                        kind = OverlapKind.DUPLICATE,
-                        label = "Duplicate",
-                        subscriptionIds = dupes.map { it.id },
-                        merchants = listOf(dupes.first().merchant),
-                        monthlyTotal = dupes.sumOf { monthlyCost(it.amount, it.frequency) }
-                    )
+        fun add(insight: OverlapInsight) {
+            val ids = insight.subscriptionIds.toSet()
+            // Skip a finding that is already part of a bigger, more specific one
+            if (claimed.any { it.containsAll(ids) }) return
+            claimed.add(ids)
+            result.add(insight)
+        }
+
+        // Plans that already include other services
+        for (bundle in bundles) {
+            val owners = active.filter { matches(it, bundle.names) }
+            if (owners.isEmpty()) continue
+            val owner = owners.first()
+            val covered = active.filter { it.id != owner.id && owners.none { o -> o.id == it.id } && matches(it, bundle.includes) }
+            if (covered.isEmpty()) continue
+            add(
+                OverlapInsight(
+                    kind = OverlapKind.BUNDLE,
+                    label = "Bundle",
+                    subscriptionIds = listOf(owner.id) + covered.map { it.id },
+                    merchants = covered.map { it.merchant },
+                    monthlyTotal = covered.sumOf { monthlyCost(it.amount, it.frequency) },
+                    bundleName = owner.merchant
                 )
+            )
+        }
+
+        // The same service tracked more than once (two UPI apps, a slip in the name) or as two plans
+        val names = active.map { normalizeName(it.merchant) }
+        val parent = IntArray(active.size) { it }
+        fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; return r }
+        for (i in active.indices) for (j in i + 1 until active.size) {
+            if (!sameName(names[i], names[j])) continue
+            // A placeholder name ("Subscription via Paytm") says nothing about the service, and two
+            // mandates with very different amounts are two different things
+            if (names[i] in placeholderNames || names[j] in placeholderNames) continue
+            val hi = maxOf(active[i].amount, active[j].amount)
+            val lo = minOf(active[i].amount, active[j].amount)
+            if (names[i] == names[j] && lo > 0 && hi / lo > 1.25) continue
+            parent[find(i)] = find(j)
+        }
+        active.indices.groupBy { find(it) }.values.filter { it.size >= 2 }.forEach { members ->
+            val subs = members.map { active[it] }
+            val allSame = members.all { names[it] == names[members.first()] || editDistance(names[it], names[members.first()]) <= 1 }
+            val cost = subs.sumOf { monthlyCost(it.amount, it.frequency) }
+            if (allSame) {
+                add(OverlapInsight(OverlapKind.DUPLICATE, "Duplicate", subs.map { it.id }, listOf(subs.first().merchant), cost))
+            } else {
+                val brand = subs.minByOrNull { it.merchant.length }!!.merchant
+                add(OverlapInsight(OverlapKind.SAME_SERVICE, brand, subs.map { it.id }, subs.map { it.merchant }, cost))
             }
+        }
+
+        // Well-known services whose plans have different names
+        for ((brand, aliases) in families) {
+            val members = active.filter { matches(it, aliases) }
+            if (members.size >= 2) {
+                add(OverlapInsight(OverlapKind.SAME_SERVICE, brand, members.map { it.id }, members.map { it.merchant }, members.sumOf { monthlyCost(it.amount, it.frequency) }))
+            }
+        }
 
         // Different services that do the same job
         for ((label, keywords) in groups) {
-            val members = active.filter { sub ->
-                val lower = sub.merchant.lowercase()
-                keywords.any { lower.contains(it) }
-            }
+            val members = active.filter { matches(it, keywords) }
             val distinctServices = members.distinctBy { normalizeName(it.merchant) }
             if (distinctServices.size >= 2) {
-                result.add(
+                add(
                     OverlapInsight(
                         kind = OverlapKind.OVERLAP,
                         label = label,
@@ -284,7 +404,7 @@ object Trials {
 
 enum class LeakSeverity { HIGH, MEDIUM }
 
-enum class LeakKind { OVER_BUDGET, NEAR_BUDGET, TRIAL, DUPLICATE, OVERLAP, HIGH_INTEREST, STALE_CHARGE, MANDATE_LIMIT }
+enum class LeakKind { OVER_BUDGET, NEAR_BUDGET, TRIAL, DUPLICATE, BUNDLE, SAME_SERVICE, OVERLAP, HIGH_INTEREST, STALE_CHARGE, MANDATE_LIMIT }
 
 data class Leak(
     val kind: LeakKind,
@@ -340,16 +460,27 @@ object LeakFinder {
         }
 
         for (insight in OverlapDetector.detect(subscriptions)) {
-            leaks.add(
-                Leak(
-                    if (insight.kind == OverlapKind.DUPLICATE) LeakKind.DUPLICATE else LeakKind.OVERLAP,
-                    if (insight.kind == OverlapKind.DUPLICATE) LeakSeverity.HIGH else LeakSeverity.MEDIUM,
-                    insight.title,
-                    "${insight.merchants.joinToString(" + ")} together cost ${CurrencyFormatter.format(insight.monthlyTotal)}/month. " +
-                        if (insight.kind == OverlapKind.DUPLICATE) "Keep one and cancel the other." else "Keep the one you use most?",
-                    insight.subscriptionIds
+            val monthly = CurrencyFormatter.format(insight.monthlyTotal)
+            val yearly = CurrencyFormatter.format(insight.monthlyTotal * 12)
+            val (kind, severity, body) = when (insight.kind) {
+                OverlapKind.DUPLICATE -> Triple(
+                    LeakKind.DUPLICATE, LeakSeverity.HIGH,
+                    "${insight.merchants.joinToString(" + ")} together cost $monthly/month. Keep one and cancel the other."
                 )
-            )
+                OverlapKind.BUNDLE -> Triple(
+                    LeakKind.BUNDLE, LeakSeverity.HIGH,
+                    "You also pay for them separately: $monthly/month ($yearly a year). Cancelling the separate ones keeps the same access."
+                )
+                OverlapKind.SAME_SERVICE -> Triple(
+                    LeakKind.SAME_SERVICE, LeakSeverity.MEDIUM,
+                    "${insight.merchants.joinToString(" + ")} cost $monthly/month together. One plan is usually enough."
+                )
+                OverlapKind.OVERLAP -> Triple(
+                    LeakKind.OVERLAP, LeakSeverity.MEDIUM,
+                    "${insight.merchants.joinToString(" + ")} together cost $monthly/month. Keep the one you use most?"
+                )
+            }
+            leaks.add(Leak(kind, severity, insight.title, body, insight.subscriptionIds))
         }
 
         for (sub in subscriptions.filter { it.status == "ACTIVE" && it.kind == "EMI" }) {

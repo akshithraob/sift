@@ -74,7 +74,7 @@ class DefaultRecurringDetector : RecurringDetector {
         "subscriptions", "subscription", "groceries", "shopping", "dining", "food", "delivery", "transport", "transfers",
         "rent", "cash", "savings", "health", "utilities", "insurance", "loan", "emi", "investments", "education",
         "entertainment", "travel", "salary", "income", "refund", "card", "tuition", "consulting", "fuel",
-        "neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach", "rtgs", "debit", "credit", "dr", "cr"
+        "housing", "bills", "lifestyle", "household", "neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach", "rtgs", "debit", "credit", "dr", "cr"
     )
 
     private val fillerWords = setOf("premium", "subscription", "com", "app", "standard", "plus", "mobile", "family", "pro", "prime", "one", "gold", "membership", "recharge")
@@ -86,9 +86,9 @@ class DefaultRecurringDetector : RecurringDetector {
 
     private val bankChargePattern = Regex("""(?i)(surchg|surcharge|\bchgs?\b|\bgst\b|\bcess\b|bal(ance)? inq|sms (alert|charge)|service charge|min(imum)? bal|\bnfs\b.*\bfee\b|cash txn|st\s*&\s*ec)""")
 
-    private val cashPattern = Regex("""(?i)\b(atm|cash\s+withdrawal|cash\s*wdl|cash\s+deposit)\b|^cash$""")
+    private val cashPattern = Regex("""(?i)\b(atm|nwd|cash\s+withdrawal|cash\s*wdl|cash\s+deposit)\b|^cash$""")
 
-    private val modeWords = setOf("neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach", "rtgs", "dr", "cr")
+    private val modeWords = setOf("neft", "upi", "pos", "si", "ach", "imps", "bbps", "trf", "atm", "ecs", "nach", "rtgs", "dr", "cr", "mandate")
 
     /**
      * Some statements print a category after an UPPER-CASE narration ("HOME LOAN EMI Loan EMI ACH"). When
@@ -307,12 +307,22 @@ class DefaultRecurringDetector : RecurringDetector {
 
     private fun normalizeName(rawNarration: String, stripChannel: Boolean): String {
         var clean = cutCategorySuffix(rawNarration).uppercase().trim()
+        // A dash left over from the value-date column ("- ACH/KESTREL BIKE LOAN") is not part of the name
+        clean = clean.replace(Regex("^[\\s\\-–—]+"), "")
 
         clean = clean.replace(Regex("\\([^)]*\\)"), " ")
 
         // Channel words that start a narration ("ECS/SI DR - X", "UPI DR - X", "SIP DR X", "BILLPAY X")
-        if (stripChannel) clean = clean.replace(Regex("^(?:(?:ECS|SI|DR|CR|UPI|POS|NACH|NEFT|EMI|SIP|BILLPAY|BILL|ATM|WDL|IMPS|RTGS|ACH|ECOM|AUTOPAY|AUTODEBIT|DEBIT|CREDIT|RECURRING)(?:[ /]+|$))+(?:[-:]+ *)?"), " ")
+        if (stripChannel) {
+            val before = clean
+            clean = clean.replace(Regex("^(?:(?:ECS|SI|DR|CR|UPI|POS|NACH|NEFT|EMI|SIP|BILLPAY|BILL|ATM|WDL|IMPS|RTGS|ACH|ACHDR|ACHCR|ECOM|AUTOPAY|AUTODEBIT|DEBIT|CREDIT|RECURRING|IB|MMT|VPS|NFS|NWD|CAM|TPT|INF|BIL|BBPS|CHQ|MANDATE)(?:[ /-]+|$)|D(?=-))+(?:[-:]+ *)?"), " ")
+            // "EMI 12345 CHQ ZENFIN": stripping the channel leaves only "Zenfin"; keep the fact that it is an EMI
+            if (Regex("^EMI" + "\\b").containsMatchIn(before.trim()) && !Regex("\\b(EMI|LOAN)\\b").containsMatchIn(clean)) clean = clean.trim() + " EMI"
+        }
         clean = clean.trim()
+
+        // Month tags in a narration ("EMI JAN26", "FEB-2026") make each month look like another merchant
+        clean = clean.replace(Regex("\\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|SEPT|OCT|NOV|DEC)[A-Z]*[- ]?(20)?\\d{2}\\b"), " ")
 
         // 1. Strip UPI IDs (e.g. swiggy@icici, spotify@paytm, user@okaxis)
         clean = clean.replace(Regex("[a-zA-Z0-9._]+@[a-zA-Z0-9.]+"), " ")
@@ -345,7 +355,9 @@ class DefaultRecurringDetector : RecurringDetector {
         // Trailing mode words (UPI, NEFT, SI...) are the payment channel, not the merchant
         val words = clean.split(" ").filter { it.isNotEmpty() }.toMutableList()
         while (words.size > 1 && words.last().lowercase() in modeWords) words.removeAt(words.lastIndex)
-        clean = words.joinToString(" ")
+        // "Mobile Emi Emi": a word repeated straight after itself is read once
+        val deduped = words.filterIndexed { i, w -> i == 0 || !w.equals(words[i - 1], ignoreCase = true) }
+        clean = deduped.joinToString(" ")
 
         // Known merchant mapping
         val merchantDisplayMap = mapOf(

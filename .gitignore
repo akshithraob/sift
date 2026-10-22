@@ -20,3 +20,6 @@ debug.keystore
 *.keystore
 keystore.properties
 dist/
+
+# launch-video output
+brag-output*/

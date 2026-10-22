@@ -2,7 +2,7 @@
 
 **Find the payments quietly draining your account.** Leakproof is a native Android app for India that finds your recurring payments (UPI Autopay mandates, e-NACH/ACH debits, standing instructions, SIPs, EMIs and card subscriptions) without manual entry, then helps you track, question and cancel them.
 
-**Your data never leaves your phone.** Leakproof does not declare the `INTERNET` permission, and has no backend, analytics, crash-reporting or ad SDKs. The build fails if that ever changes.
+**Plug the leaks. Keep your data.** Leakproof does not declare the `INTERNET` permission, and has no backend, analytics, crash-reporting or ad SDKs. The build fails if that ever changes.
 
 ## What it does
 

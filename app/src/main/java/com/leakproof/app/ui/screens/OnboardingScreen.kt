@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -232,9 +233,9 @@ private fun DrawScope.drawPhoneWithoutCloud(c: Offset, ink: Color, soft: Color, 
     drawRoundRect(soft, Offset(c.x - w / 2, c.y - h / 2), Size(w, h), CornerRadius(18.dp.toPx()))
     drawRoundRect(ink.copy(alpha = 0.8f), Offset(c.x - w / 2, c.y - h / 2), Size(w, h), CornerRadius(18.dp.toPx()), style = Stroke(3.dp.toPx()))
     drawRoundRect(ink.copy(alpha = 0.5f), Offset(c.x - 14.dp.toPx(), c.y - h / 2 + 8.dp.toPx()), Size(28.dp.toPx(), 4.dp.toPx()), CornerRadius(2.dp.toPx()))
-    // The drop sits safely inside the phone
-    val dropScale = 1f + 0.05f * pulse
-    drawDrop(Offset(c.x, c.y + 4.dp.toPx()), 20.dp.toPx() * dropScale, primary)
+    // The mark sits safely inside the phone
+    val markScale = 1f + 0.05f * pulse
+    drawSieve(Offset(c.x, c.y + 4.dp.toPx()), 20.dp.toPx() * markScale, primary)
     // A cloud, crossed out
     val cloud = Offset(c.x + w / 2 + 18.dp.toPx(), c.y - h / 2 + 18.dp.toPx())
     drawCircle(ink.copy(alpha = 0.25f), 11.dp.toPx(), cloud)
@@ -281,18 +282,25 @@ private fun DrawScope.drawRadar(c: Offset, soft: Color, primary: Color, angle: F
     listOf(Offset(0.45f, -0.5f), Offset(-0.55f, 0.2f), Offset(0.2f, 0.62f), Offset(-0.2f, -0.65f)).forEach { p ->
         drawCircle(Color(0xFFF5A524), 6.dp.toPx(), Offset(c.x + p.x * r, c.y + p.y * r))
     }
-    drawDrop(c, 15.dp.toPx(), primary)
+    drawSieve(c, 15.dp.toPx(), primary)
     drawCircle(soft, 0f, c)
 }
 
-private fun DrawScope.drawDrop(center: Offset, size: Float, color: Color) {
-    val path = Path().apply {
-        moveTo(center.x, center.y - size * 1.1f)
-        cubicTo(center.x, center.y - size * 1.1f, center.x - size, center.y - size * 0.15f, center.x - size, center.y + size * 0.3f)
-        cubicTo(center.x - size, center.y + size * 0.85f, center.x - size * 0.55f, center.y + size * 1.1f, center.x, center.y + size * 1.1f)
-        cubicTo(center.x + size * 0.55f, center.y + size * 1.1f, center.x + size, center.y + size * 0.85f, center.x + size, center.y + size * 0.3f)
-        cubicTo(center.x + size, center.y - size * 0.15f, center.x, center.y - size * 1.1f, center.x, center.y - size * 1.1f)
+/** The Sift mark: a sieve with a few holes and dots falling through it. */
+private fun DrawScope.drawSieve(center: Offset, size: Float, color: Color) {
+    val rimY = center.y - size * 0.9f
+    val bowl = Path().apply {
+        moveTo(center.x + size, rimY)
+        arcTo(Rect(center.x - size, rimY - size, center.x + size, rimY + size), 0f, 180f, false)
         close()
     }
-    drawPath(path, color)
+    drawPath(bowl, color)
+    drawRoundRect(color, Offset(center.x - size * 1.1f, rimY - size * 0.12f), Size(size * 2.2f, size * 0.2f), CornerRadius(size * 0.1f))
+    val hole = Color.Black.copy(alpha = 0.3f)
+    listOf(Offset(-0.45f, 0.3f), Offset(0f, 0.3f), Offset(0.45f, 0.3f), Offset(-0.22f, 0.62f), Offset(0.22f, 0.62f)).forEach { p ->
+        drawCircle(hole, size * 0.09f, Offset(center.x + p.x * size, rimY + p.y * size))
+    }
+    drawCircle(color, size * 0.11f, Offset(center.x - size * 0.2f, rimY + size * 1.35f))
+    drawCircle(color, size * 0.09f, Offset(center.x + size * 0.25f, rimY + size * 1.5f))
+    drawCircle(color, size * 0.07f, Offset(center.x, rimY + size * 1.78f))
 }

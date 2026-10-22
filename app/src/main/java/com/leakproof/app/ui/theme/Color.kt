@@ -3,7 +3,7 @@ package com.leakproof.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ---------------------------------------------------------------- Brand
-val BrandPrimary = Color(0xFF00BFA5)          // The Sift teal: fills, accents, the drop mark
+val BrandPrimary = Color(0xFF00BFA5)          // The Sift teal: fills, accents, the sieve mark
 val BrandPrimaryVariant = Color(0xFF00796B)   // Readable on white (teal 700)
 val BrandSecondary = Color(0xFF26A69A)
 val BrandDeep = Color(0xFF00574D)             // Bottom of the hero gradient

@@ -15,7 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.ui.res.painterResource
+import com.leakproof.app.R
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -107,7 +108,7 @@ fun BrandMark(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.WaterDrop,
+                painter = painterResource(R.drawable.ic_sift_mark),
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(18.dp)
@@ -115,7 +116,7 @@ fun BrandMark(modifier: Modifier = Modifier) {
         }
         Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text = "Leakproof",
+            text = "Sift",
             fontWeight = FontWeight.ExtraBold,
             fontSize = 20.sp,
             color = MaterialTheme.colorScheme.onBackground

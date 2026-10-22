@@ -82,7 +82,7 @@ private val AppShapes = Shapes(
 @Composable
 fun LeakproofTheme(
     themeMode: Int = 0,
-    dynamicColor: Boolean = false, // The Leakproof palette is part of the brand
+    dynamicColor: Boolean = false, // The Sift palette is part of the brand
     content: @Composable () -> Unit,
 ) {
     val darkTheme = when (themeMode) {

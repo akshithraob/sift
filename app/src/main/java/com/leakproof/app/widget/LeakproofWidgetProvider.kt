@@ -74,9 +74,9 @@ class LeakproofWidgetProvider : AppWidgetProvider() {
         internal data class Lines(val main: String, val line1: String, val line2: String)
 
         internal fun describe(summary: WidgetSummary?, showDetails: Boolean, unavailable: Boolean): Lines {
-            if (unavailable || summary == null) return Lines("Leakproof", "Open the app to get started", "")
+            if (unavailable || summary == null) return Lines("Sift", "Open the app to get started", "")
             if (!showDetails) {
-                return Lines("Leakproof", "Tap to open", "Amounts are hidden. Show them in Settings.")
+                return Lines("Sift", "Tap to open", "Amounts are hidden. Show them in Settings.")
             }
             if (summary.activeCount == 0) return Lines("Nothing tracked yet", "Tap to add your first one", "")
 

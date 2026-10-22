@@ -5,7 +5,8 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.PublicOff
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.ui.res.painterResource
+import com.leakproof.app.R
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
@@ -72,7 +73,7 @@ fun ConsentScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.WaterDrop,
+                    painter = painterResource(R.drawable.ic_sift_mark),
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(34.dp)
@@ -87,7 +88,7 @@ fun ConsentScreen(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Before you start, here is what Leakproof does with your information.",
+                text = "Before you start, here is what Sift does with your information.",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -123,7 +124,7 @@ fun ConsentScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "By tapping \"I agree\", you consent to Leakproof processing your information on your device for the purposes above.",
+                text = "By tapping \"I agree\", you consent to Sift processing your information on your device for the purposes above.",
                 fontSize = 12.sp,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

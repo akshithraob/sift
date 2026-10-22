@@ -32,7 +32,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- "Share > Leakproof": screenshots, a statement PDF or a CSV, read on the device only -->
+            <!-- "Share > Sift": screenshots, a statement PDF or a CSV, read on the device only -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />

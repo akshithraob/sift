@@ -1,12 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A water drop sealed with a keyhole: "leakproof". Kept inside the 66dp adaptive-icon safe zone. -->
+<!-- The Sift mark (a sieve with dots falling through), scaled to sit inside the 66dp adaptive-icon safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M54,25 C54,25 36,45 36,58 C36,68 44,76 54,76 C64,76 72,68 72,58 C72,45 54,25 54,25 Z M49.5,56 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 Z M52,59 L56,59 L57.6,67 L50.4,67 Z" />
+    <group
+        android:scaleX="2.3"
+        android:scaleY="2.3"
+        android:translateX="26.4"
+        android:translateY="19">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M2.5,6.6 L21.5,6.6 C21.5,6.6 21.9,7 21.9,7.6 C21.9,8.2 21.5,8.6 21.5,8.6 L21,8.6 C20.5,13.8 16.7,17.4 12,17.4 C7.3,17.4 3.5,13.8 3,8.6 L2.5,8.6 C2.5,8.6 2.1,8.2 2.1,7.6 C2.1,7 2.5,6.6 2.5,6.6 Z M7.6,11.2 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0 Z M11.1,11.2 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0 Z M14.6,11.2 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0 Z M9.35,14 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0 Z M12.85,14 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M9.2,19.4 a1.05,1.05 0 1,0 2.1,0 a1.05,1.05 0 1,0 -2.1,0 Z M13.4,19.9 a0.85,0.85 0 1,0 1.7,0 a0.85,0.85 0 1,0 -1.7,0 Z M11.4,22.3 a0.7,0.7 0 1,0 1.4,0 a0.7,0.7 0 1,0 -1.4,0 Z" />
+    </group>
 </vector>

@@ -82,7 +82,7 @@ fun ImportGuideSheet(onContinue: (dontShowAgain: Boolean) -> Unit) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Leakproof finds your recurring payments from messy bank text and screenshots. It does a lot of the work, " +
+                "Sift finds your recurring payments from messy bank text and screenshots. It does a lot of the work, " +
                     "but it can get a name wrong or cut short. You know your own subscriptions best.",
                 fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )

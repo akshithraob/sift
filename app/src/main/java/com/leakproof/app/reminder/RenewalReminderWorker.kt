@@ -1,5 +1,6 @@
 package com.leakproof.app.reminder
 
+import com.leakproof.app.R
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -97,8 +98,8 @@ class RenewalReminderWorker(
         ensureChannel(context)
 
         val publicVersion = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Leakproof")
+            .setSmallIcon(R.drawable.ic_sift_mark)
+            .setContentTitle("Sift")
             .setContentText("You have an update")
             .build()
 
@@ -108,7 +109,7 @@ class RenewalReminderWorker(
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_sift_mark)
             .setContentTitle(title)
             .setContentText(detail)
             .setStyle(NotificationCompat.BigTextStyle().bigText(detail))

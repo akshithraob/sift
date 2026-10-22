@@ -1,8 +1,8 @@
-# Leakproof incident response plan
+# Sift incident response plan
 
 Version 1 · 18 October 2026 · Owner: Akshith Rao B
 
-Leakproof keeps all user data on the user's phone. There is no server, no account and no network permission, so the usual incident (a breached database) cannot happen here. The realistic incidents are about **the app itself**: a bad update, a compromised signing key, a vulnerable library, a bug that exposes data on the device, or someone impersonating the app. This plan covers those, and meets the reporting duties below.
+Sift keeps all user data on the user's phone. There is no server, no account and no network permission, so the usual incident (a breached database) cannot happen here. The realistic incidents are about **the app itself**: a bad update, a compromised signing key, a vulnerable library, a bug that exposes data on the device, or someone impersonating the app. This plan covers those, and meets the reporting duties below.
 
 ## Reporting duties this plan satisfies
 
@@ -29,7 +29,7 @@ One person owns this today: the publisher. Fill these in before launch and keep 
 | Release integrity | Upload key or Play account compromised, unexpected release appears, tampered APK/AAB | Critical |
 | Data exposure by the app | A bug writes subscription data to logs, backups, notifications or exports, re-enables a network permission, or weakens the database encryption | Critical |
 | Vulnerable dependency | A published vulnerability in SQLCipher, PdfBox-Android, ML Kit, AndroidX or another library the app ships | High, Critical if exploitable through a screenshot or statement the user opens |
-| Impersonation | A fake "Leakproof" app on Play or elsewhere, a phishing page using the name | High |
+| Impersonation | A fake "Sift" app on Play or elsewhere, a phishing page using the name | High |
 | Privacy request failure | A user cannot delete data or withdraw consent, or a grievance goes unanswered past 30 days | Medium |
 
 Critical and High incidents start the clock at the moment someone first notices or is told, not when it is confirmed.

@@ -43,7 +43,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.ui.res.painterResource
+import com.leakproof.app.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -700,7 +701,7 @@ private fun EmptyDashboard(onImport: () -> Unit, onAddManually: () -> Unit, modi
                 .background(Brush.linearGradient(listOf(HeroTop, HeroBottom))),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.WaterDrop, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
+            Icon(painterResource(R.drawable.ic_sift_mark), contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
         }
         Spacer(modifier = Modifier.height(22.dp))
         Text(
@@ -711,7 +712,7 @@ private fun EmptyDashboard(onImport: () -> Unit, onAddManually: () -> Unit, modi
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Add a screenshot of your UPI app's Autopay list or a bank statement. Leakproof finds every recurring payment, " +
+            "Add a screenshot of your UPI app's Autopay list or a bank statement. Sift finds every recurring payment, " +
                 "flags the ones you're paying twice, and keeps it all on your phone.",
             fontSize = 14.sp,
             lineHeight = 21.sp,

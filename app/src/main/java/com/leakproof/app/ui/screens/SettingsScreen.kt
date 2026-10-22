@@ -356,7 +356,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text("Show amounts on the widget", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                         Text(
-                            "Add the Leakproof widget from your home screen's widget list. It stays blank until you turn this on, " +
+                            "Add the Sift widget from your home screen's widget list. It stays blank until you turn this on, " +
                                 "because anyone who sees your home screen could read it.",
                             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -493,7 +493,7 @@ fun SettingsScreen(
                     PrivacyBulletItem(
                         icon = Icons.Default.PublicOff,
                         title = "Zero Network Guarantee",
-                        description = "Leakproof does NOT request the android.permission.INTERNET permission. It is impossible for data to leave this device."
+                        description = "Sift does NOT request the android.permission.INTERNET permission. It is impossible for data to leave this device."
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     PrivacyBulletItem(
@@ -581,7 +581,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Drops the encrypted database file, purges master keys from the Keystore, and restores Leakproof to its initial fresh state.",
+                        text = "Drops the encrypted database file, purges master keys from the Keystore, and restores Sift to its initial fresh state.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 17.sp
@@ -702,7 +702,7 @@ private fun BackupSection(viewModel: LeakproofViewModel) {
                     Column {
                         Text(
                             "Choose a passphrase of at least ${com.leakproof.app.backup.BackupCrypto.MIN_PASSPHRASE_LENGTH} characters. " +
-                                "Leakproof never stores it and cannot recover it: if you forget it, the backup cannot be opened.",
+                                "Sift never stores it and cannot recover it: if you forget it, the backup cannot be opened.",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -732,7 +732,7 @@ private fun BackupSection(viewModel: LeakproofViewModel) {
                 confirmButton = {
                     Button(
                         enabled = !tooShort && !mismatch,
-                        onClick = { viewModel.beginExternalPicker(); createLauncher.launch("leakproof-backup-$stamp.lpbackup") },
+                        onClick = { viewModel.beginExternalPicker(); createLauncher.launch("sift-backup-$stamp.lpbackup") },
                         colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                         modifier = Modifier.testTag("backup_choose_location_button")
                     ) { Text("Choose where to save") }
@@ -796,7 +796,7 @@ private fun BackupSection(viewModel: LeakproofViewModel) {
                     Button(
                         onClick = {
                             closeDialog()
-                            viewModel.beginExternalPicker(); csvLauncher.launch("leakproof-subscriptions-$stamp.csv")
+                            viewModel.beginExternalPicker(); csvLauncher.launch("sift-subscriptions-$stamp.csv")
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                         modifier = Modifier.testTag("csv_export_anyway_button")

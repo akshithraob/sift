@@ -66,7 +66,7 @@ object BackupCrypto {
         if (blob.size < HEADER_BYTES + IV_BYTES + TAG_BITS / 8 ||
             !blob.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)
         ) {
-            throw InvalidBackupException("This is not a Leakproof backup file")
+            throw InvalidBackupException("This is not a Sift backup file")
         }
         val iterations = bytesToInt(blob, MAGIC.size)
         if (iterations !in MIN_ITERATIONS..MAX_ITERATIONS) {
@@ -154,9 +154,9 @@ object BackupCodec {
     fun decode(bytes: ByteArray): BackupContents {
         try {
             val root = JSONObject(String(bytes, Charsets.UTF_8))
-            if (root.optString("format") != FORMAT) throw InvalidBackupException("This is not a Leakproof backup file")
+            if (root.optString("format") != FORMAT) throw InvalidBackupException("This is not a Sift backup file")
             if (root.optInt("version", 0) > VERSION) {
-                throw InvalidBackupException("This backup was made by a newer version of Leakproof. Update the app and try again.")
+                throw InvalidBackupException("This backup was made by a newer version of Sift. Update the app and try again.")
             }
             val array = root.getJSONArray("subscriptions")
             val subs = (0 until array.length()).map { i ->

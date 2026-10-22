@@ -99,7 +99,7 @@ class LegalTest {
     fun theRealPolicyParsesIntoReadableBlocks() {
         val blocks = SimpleMarkdown.parse(PolicyText.render(template, info))
 
-        assertEquals(MdBlock.Heading(1, "Leakproof Privacy Policy"), blocks.first())
+        assertEquals(MdBlock.Heading(1, "Sift Privacy Policy"), blocks.first())
         assertTrue(blocks.count { it is MdBlock.Heading && it.level == 2 } >= 10)
         assertTrue(blocks.any { it is MdBlock.Bullet })
     }

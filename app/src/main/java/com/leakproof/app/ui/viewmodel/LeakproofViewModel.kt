@@ -240,7 +240,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
                     contentResolver.openInputStream(uri)?.use { readAtMost(it, MAX_BACKUP_BYTES) }
                         ?: throw java.io.IOException("no stream")
                 }
-                if (blob.size > MAX_BACKUP_BYTES) throw InvalidBackupException("This file is too large to be a Leakproof backup")
+                if (blob.size > MAX_BACKUP_BYTES) throw InvalidBackupException("This file is too large to be a Sift backup")
                 val contents = BackupCodec.decode(BackupCrypto.decrypt(blob, passphrase))
                 val plan = repository.restoreMerging(contents.subscriptions)
                 if (prefs.monthlyBudget == 0.0 && contents.monthlyBudget > 0.0) setMonthlyBudget(contents.monthlyBudget)
@@ -293,7 +293,7 @@ class LeakproofViewModel(application: Application) : AndroidViewModel(applicatio
         com.leakproof.app.widget.LeakproofWidgetProvider.refresh(getApplication())
     }
 
-    // Files shared into the app from another app ("Share > Leakproof")
+    // Files shared into the app from another app ("Share > Sift")
     enum class SharedKind { IMAGES, PDF, CSV }
     data class SharedImport(val uris: List<android.net.Uri>, val kind: SharedKind)
 

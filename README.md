@@ -1,8 +1,8 @@
-# Leakproof
+# Sift
 
-**Find the payments quietly draining your account.** Leakproof is a native Android app for India that finds your recurring payments (UPI Autopay mandates, e-NACH/ACH debits, standing instructions, SIPs, EMIs and card subscriptions) without manual entry, then helps you track, question and cancel them.
+**Find the payments quietly draining your account.** Sift is a native Android app for India that finds your recurring payments (UPI Autopay mandates, e-NACH/ACH debits, standing instructions, SIPs, EMIs and card subscriptions) without manual entry, then helps you track, question and cancel them.
 
-**Plug the leaks. Keep your data.** Leakproof does not declare the `INTERNET` permission, and has no backend, analytics, crash-reporting or ad SDKs. The build fails if that ever changes.
+**Sift out the leaks. Keep your data.** Sift does not declare the `INTERNET` permission, and has no backend, analytics, crash-reporting or ad SDKs. The build fails if that ever changes.
 
 ## What it does
 
@@ -14,9 +14,9 @@
 - **Annual-renewal radar**: yearly payments coming up in the next 90 days, with a heads-up notification a month and a week before.
 - **Year in review**: what everything adds up to, your priciest subscription, what you saved by cancelling and your busiest month. The shareable summary has totals only.
 - **Home-screen widget**: this month's total and the next renewal. It stays blank until you turn on "Show amounts on the widget" in Settings, because a home screen is visible to anyone holding the phone.
-- **Share to Leakproof**: share screenshots, a statement PDF or a CSV from any app (Files, WhatsApp, a browser) straight into the import. The app lock still comes first.
+- **Share to Sift**: share screenshots, a statement PDF or a CSV from any app (Files, WhatsApp, a browser) straight into the import. The app lock still comes first.
 - **Stronger overlap detection**: bundles that already include other services (Apple One, Prime, YouTube Premium), several plans of one service, near-duplicate names, and more categories (gaming, VPN, design, wellness).
-- **Cancel guides**: Leakproof cannot revoke mandates itself, so it deep-links to your UPI app or https://upihelp.npci.org.in and shows step-by-step guides from the bundled `merchants.json`.
+- **Cancel guides**: Sift cannot revoke mandates itself, so it deep-links to your UPI app or https://upihelp.npci.org.in and shows step-by-step guides from the bundled `merchants.json`.
 - **Trust Center**: shows, from your own phone, that this copy has no internet permission, no cloud backup, and which certificate signed it, plus exactly what is and is not stored.
 - Light, dark and system themes; encrypted backup and restore; DPDP Act consent and a built-in privacy policy.
 

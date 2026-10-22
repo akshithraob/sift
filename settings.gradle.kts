@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Leakproof"
+rootProject.name = "Sift"
 
 include(":app")

@@ -1,8 +1,8 @@
-# Leakproof Privacy Policy
+# Sift Privacy Policy
 
 Version 1 · Effective 18 October 2026
 
-Leakproof is published by **Akshith Rao B**. This policy explains what the app does with your information, in line with India's Digital Personal Data Protection Act, 2023 (DPDP Act).
+Sift is published by **Akshith Rao B**. This policy explains what the app does with your information, in line with India's Digital Personal Data Protection Act, 2023 (DPDP Act).
 
 ## The short version
 
@@ -38,7 +38,7 @@ Only to do what you asked: list your recurring payments, remind you before they 
 
 ## Who it is shared with
 
-Nobody. Leakproof has no network permission and does not contain any service that receives your data. The text recognizer runs on your phone using a model bundled with the app.
+Nobody. Sift has no network permission and does not contain any service that receives your data. The text recognizer runs on your phone using a model bundled with the app.
 
 ## Backups and exports you create
 
@@ -65,7 +65,7 @@ Until you remove it: delete a single subscription, use **Delete all my data** in
 
 ## Children
 
-Leakproof is not meant for anyone under 18.
+Sift is not meant for anyone under 18.
 
 ## Changes to this policy
 

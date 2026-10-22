@@ -71,7 +71,7 @@ private val pages = listOf(
     OnboardingPage(
         "Zero cloud.\nEverything on-device.",
         "Private by design",
-        "Leakproof has no network permission. No servers, no tracking, no external APIs. Your statements and screenshots never leave this phone."
+        "Sift has no network permission. No servers, no tracking, no external APIs. Your statements and screenshots never leave this phone."
     ),
     OnboardingPage(
         "An encrypted vault",
@@ -81,7 +81,7 @@ private val pages = listOf(
     OnboardingPage(
         "Find every leak",
         "UPI, e-NACH, standing instructions, EMIs",
-        "Import a Google Pay, PhonePe or Paytm Autopay screenshot, or a bank statement. Leakproof reads it on your phone and finds what you pay."
+        "Import a Google Pay, PhonePe or Paytm Autopay screenshot, or a bank statement. Sift reads it on your phone and finds what you pay."
     )
 )
 

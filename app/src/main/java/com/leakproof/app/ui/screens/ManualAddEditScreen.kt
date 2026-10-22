@@ -260,7 +260,7 @@ fun ManualAddEditScreen(
                     )
                 }
                 Text(
-                    "Optional: the rate and balance let Leakproof estimate what an extra payment would save.",
+                    "Optional: the rate and balance let Sift estimate what an extra payment would save.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)

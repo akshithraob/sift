@@ -12,7 +12,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:letterSpacing="0.12"
-        android:text="LEAKPROOF"
+        android:text="SIFT"
         android:textColor="#CCFFFFFF"
         android:textSize="10sp"
         android:textStyle="bold" />
@@ -27,7 +27,7 @@
         android:autoSizeMinTextSize="14sp"
         android:autoSizeTextType="uniform"
         android:maxLines="1"
-        android:text="Leakproof"
+        android:text="Sift"
         android:textColor="#FFFFFF"
         android:textSize="24sp"
         android:textStyle="bold" />

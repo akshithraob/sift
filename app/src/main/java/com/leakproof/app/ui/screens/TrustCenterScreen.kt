@@ -86,7 +86,7 @@ fun TrustCenterScreen(viewModel: LeakproofViewModel, onNavigateBack: () -> Unit)
                 .testTag("trust_center")
         ) {
             Text(
-                "Don't take our word for it. These checks are read from your phone about this exact copy of Leakproof.",
+                "Don't take our word for it. These checks are read from your phone about this exact copy of Sift.",
                 fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))

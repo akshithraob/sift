@@ -3,7 +3,7 @@
 
     <style name="Theme.Leakproof" parent="android:Theme.DeviceDefault.NoActionBar" />
 
-    <!-- Shown while the app starts: teal background with the Leakproof drop, then the normal theme -->
+    <!-- Shown while the app starts: teal background with the Sift drop, then the normal theme -->
     <style name="Theme.Leakproof.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#00695C</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_icon</item>

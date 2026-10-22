@@ -41,7 +41,7 @@ class MainActivity : FragmentActivity() {
         handleShare(intent)
     }
 
-    /** "Share > Leakproof" from another app: hand the files over; the app lock still comes first. */
+    /** "Share > Sift" from another app: hand the files over; the app lock still comes first. */
     private fun handleShare(intent: Intent?) {
         val action = intent?.action
         if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return

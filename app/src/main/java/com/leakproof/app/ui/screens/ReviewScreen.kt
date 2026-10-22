@@ -319,7 +319,7 @@ fun ReviewScreen(
                     item(key = "unseen_section") {
                         MissingMandatesCard(
                             title = "Not charged in this statement",
-                            body = "These mandates are active in Leakproof, but this statement shows no debit for them. " +
+                            body = "These mandates are active in Sift, but this statement shows no debit for them. " +
                                 "They may be unused: if so, revoke them in your UPI app, and tick them here to mark them cancelled.",
                             tag = "unseen_mandates_card",
                             missing = unseen,

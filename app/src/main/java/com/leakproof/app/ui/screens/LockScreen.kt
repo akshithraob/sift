@@ -22,7 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.ui.res.painterResource
+import com.leakproof.app.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -90,13 +91,13 @@ fun LockScreen(
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    errorMessage = "Authentication required to open Leakproof."
+                    errorMessage = "Authentication required to open Sift."
                 }
             }
         )
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Leakproof")
+            .setTitle("Unlock Sift")
             .setSubtitle("Authenticate to access your encrypted mandates")
             .setAllowedAuthenticators(
                 BiometricManager.Authenticators.BIOMETRIC_STRONG or
@@ -140,7 +141,7 @@ fun LockScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.WaterDrop,
+                        painter = painterResource(R.drawable.ic_sift_mark),
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(54.dp)
@@ -148,7 +149,7 @@ fun LockScreen(
                 }
                 Spacer(modifier = Modifier.height(28.dp))
                 Text(
-                    text = "Leakproof is locked",
+                    text = "Sift is locked",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )

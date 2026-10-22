@@ -1,4 +1,4 @@
-# Leakproof — Project Context for Claude
+# Sift — Project Context for Claude
 
 ## What this app is
 A native Android subscription manager for Indian users. It finds the user's recurring payments (UPI Autopay mandates, e-NACH/ACH debits, standing instructions, card subscriptions) **without manual entry**, then helps them track and cancel them.
@@ -25,7 +25,7 @@ The initial project was generated in Google AI Studio ("Build an Android app") a
 - `FLAG_SECURE` on all activities. `android:allowBackup="false"` plus data-extraction rules that exclude the DB. Biometric/PIN app lock (androidx.biometric), on by default.
 - R8 strips `Log` calls in release builds. No sensitive data in logs or exceptions.
 - "Delete all my data" wipes the DB and the Keystore key.
-- Never claim "100% secure" in UI or marketing copy. Tagline: "Plug the leaks. Keep your data." (the claim itself, that data never leaves the phone, stays true and may be stated plainly).
+- Never claim "100% secure" in UI or marketing copy. Tagline: "Sift out the leaks. Keep your data." (the claim itself, that data never leaves the phone, stays true and may be stated plainly).
 
 ## Architecture
 - MVVM, ViewModel + StateFlow, Hilt, Navigation Compose, coroutines, WorkManager (local renewal reminders, 2 days before).

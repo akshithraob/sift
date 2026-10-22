@@ -216,7 +216,7 @@ private fun StatCard(label: String, big: String, note: String) {
 /** What leaves the phone when the user shares: totals only. */
 internal fun summaryText(review: YearReview): String = buildString {
     append("My recurring payments add up to ${CurrencyFormatter.format(review.yearlyTotal)} a year ")
-    append("across ${review.activeCount} payments, found with Leakproof. ")
+    append("across ${review.activeCount} payments, found with Sift. ")
     if (review.cancelledCount > 0) append("I've cancelled ${review.cancelledCount}, saving ${CurrencyFormatter.format(review.cancelledYearlySaved)} a year. ")
     if (review.leaksFound > 0) append("It flagged ${review.leaksFound} thing${if (review.leaksFound == 1) "" else "s"} worth a look. ")
     append("Everything stays on my phone.")

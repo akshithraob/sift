@@ -12,8 +12,8 @@ android {
     applicationId = "com.leakproof.app"
     minSdk = 26
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 2
+    versionName = "1.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -42,7 +42,7 @@ android {
       // Release always blocks screenshots and screen recording of the app
       buildConfigField("boolean", "ALLOW_SCREEN_CAPTURE", "false")
     }
-    // Same as release (minified, optimized) but installs side by side as "Leakproof Demo" and lets
+    // Same as release (minified, optimized) but installs side by side as "Sift Demo" and lets
     // the screen be recorded or cast, for presentations. Never distribute it to users.
     create("demo") {
       initWith(getByName("release"))

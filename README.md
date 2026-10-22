@@ -48,7 +48,7 @@ Parsing and money logic are pure Kotlin with no Android dependencies, under `app
 
 ## Download
 
-Prebuilt APKs are on the [Releases page](https://github.com/akshithraob/subtrack/releases). They are signed with a presentation key for demos, not distributed through the Play Store yet. Check the file against the published SHA-256 before installing.
+Prebuilt APKs are on the [Releases page](https://github.com/akshithraob/sift/releases). They are signed with a presentation key for demos, not distributed through the Play Store yet. Check the file against the published SHA-256 before installing.
 
 ## Building
 

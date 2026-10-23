@@ -8,7 +8,8 @@ object CurrencyFormatter {
     private val indianFormat: NumberFormat by lazy {
         NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
             maximumFractionDigits = 2
-            minimumFractionDigits = if (maximumFractionDigits == 0) 0 else 0
+            // Rupees and paise always show both digits (₹35,027.10, not ₹35,027.1)
+            minimumFractionDigits = 2
         }
     }
 
